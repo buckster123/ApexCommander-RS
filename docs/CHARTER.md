@@ -1,4 +1,4 @@
-# ApexDesktopHarness-RS — charter
+# ApexCommander-RS — charter
 
 > **The decisions log below is BINDING.** Amend it with a dated entry; never silently.
 > Where this document and the code disagree, one of them is a bug — say which.
@@ -6,7 +6,7 @@
 
 ## What this is
 
-**Apex Desktop Harness** gives agents real computer-use on a Linux desktop: AT-SPI
+**Apex Commander** gives agents real computer-use on a Linux desktop: AT-SPI
 accessibility trees for perception and action, real mouse/keyboard injection the human can
 see and override, and scoped screenshots only as fallback. Primary face is MCP-over-stdio for
 ApexOS-RS `agentd`; CLI and (later) an optional warm daemon serve humans and multi-step speed.
@@ -26,12 +26,11 @@ Standalone is first-class — ApexOS is a consumer, never the owner.
 
 ## Decisions
 
-- **D1 — Standalone sibling, crate `apex-harness` (2026-08-10).** Repo folder
-  `ApexDesktopHarness-RS` (working/product title from the PRD; may shorten later). Cargo
-  packages: `apex-harness` (core), `apex-harness-cli` (bin `apex-harness`),
-  `apex-harness-mcp` (bin `apex-harness-mcp`). *Why:* PRD binary name; garden four-face shape
-  without a REST face in v1. *Rules out:* living inside ApexOS-RS workspace on day one;
-  coupling the crate name to the long folder name.
+- **D1 — Product Apex Commander, repo `ApexCommander-RS` (2026-08-10).** Cargo packages:
+  `apex-commander` (core), `apex-commander-cli` (bin `apex-commander`),
+  `apex-commander-mcp` (bin `apex-commander-mcp`). Bootstrap titles `ApexDesktopHarness-RS` /
+  `apex-harness` are retired. *Why:* digestible product name; garden sibling shape without a
+  REST face in v1. *Rules out:* living inside ApexOS-RS workspace on day one.
 
 - **D2 — Clean-room (2026-08-10).** Requirements from the local PRD and public a11y/platform
   docs. Independent architecture, types, and wire formats. No code, schemas, or internals from
@@ -80,7 +79,7 @@ Standalone is first-class — ApexOS is a consumer, never the owner.
 
 | Phase | Scope | Done when |
 |-------|-------|-----------|
-| **P0 — Bootstrap** | Repo, charter, design, workspace, CI, `doctor` skeleton (env session detect) | `cargo test` green; `apex-harness doctor` prints a structured report; MCP `tools/list` shows `doctor` |
+| **P0 — Bootstrap** | Repo, charter, design, workspace, CI, `doctor` skeleton (env session detect) | `cargo test` green; `apex-commander doctor` prints a structured report; MCP `tools/list` shows `doctor` |
 | **P1 — Eyes** | AT-SPI connect, list apps/windows, compact snapshot, find elements | Snapshot of a real GTK/Qt window on this machine; machine-readable JSON |
 | **P2 — Hands** | Element actions + input backend + window-scoped screenshot | Click named button + type into field without screenshots in the happy path; audit log line written |
 | **P3 — Agent fit** | Full MCP catalog, skill doc, ApexOS `plugins.toml` integration notes, `selftest` | ApexOS agent (or any MCP host) completes the PRD acceptance loop |
@@ -109,10 +108,12 @@ Standalone is first-class — ApexOS is a consumer, never the owner.
 2. Batch/expression language worth it after discrete tools stabilize?
 3. Presence indicator mechanism.
 4. Depth of sensitive-app heuristics (static list vs a11y password states).
-5. Whether the repo display name shortens (e.g. `ApexHarness-RS`) while keeping crate `apex-harness`.
+5. Whether the repo display name shortens (e.g. `ApexHarness-RS`) while keeping crate `apex-commander`.
 
 ---
 
 ## Amendments
 
 - **2026-08-10** — charter adopted at Launchpad bootstrap (S0).
+- **2026-08-10** — product rename to Apex Commander / `ApexCommander-RS` / crates
+  `apex-commander*` (D1 amended). Launch branding + public GitHub.

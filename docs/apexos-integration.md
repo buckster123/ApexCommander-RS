@@ -1,16 +1,16 @@
 # ApexOS-RS integration notes
 
-Apex Desktop Harness is a **standalone sibling** (not an ApexOS workspace member).
+Apex Commander is a **standalone sibling** (not an ApexOS workspace member).
 ApexOS-RS consumes it as an MCP stdio plugin the same way it consumes Occipital / Sonus.
 
 ## Build & install (manual)
 
 ```sh
-cd ~/Projects/ApexDesktopHarness-RS
+cd ~/Projects/ApexCommander-RS
 cargo build --release --workspace
 # install binaries where agentd can exec them
-sudo install -m 755 target/release/apex-harness-mcp /usr/local/bin/apex-harness-mcp
-sudo install -m 755 target/release/apex-harness     /usr/local/bin/apex-harness
+sudo install -m 755 target/release/apex-commander-mcp /usr/local/bin/apex-commander-mcp
+sudo install -m 755 target/release/apex-commander     /usr/local/bin/apex-commander
 ```
 
 On a development box you may point `cmd` at the cargo target path instead.
@@ -21,19 +21,19 @@ Append to `/etc/agentd/plugins.toml` (or the agentd config path used by the node
 **Keep commented until the binary is installed** — same house pattern as Occipital/Sonus.
 
 ```toml
-# Apex Desktop Harness — AT-SPI-first computer use (Linux).
-# Standalone sibling: github.com/buckster123/ApexDesktopHarness-RS
-# Not built by ApexOS `cargo build --workspace`. Install apex-harness-mcp separately.
+# Apex Commander — AT-SPI-first computer use (Linux).
+# Standalone sibling: github.com/buckster123/ApexCommander-RS
+# Not built by ApexOS `cargo build --workspace`. Install apex-commander-mcp separately.
 #
 # [[plugin]]
-# id      = "apex-harness"
-# cmd     = "/usr/local/bin/apex-harness-mcp"
+# id      = "apex-commander"
+# cmd     = "/usr/local/bin/apex-commander-mcp"
 # args    = []
 # restart = "on-failure"
 # [plugin.env]
 # RUST_LOG = "warn"
-# # APEX_HARNESS_STATE_DIR  = "/var/lib/agentd/apex-harness"
-# # APEX_HARNESS_CONFIG_DIR = "/etc/apex-harness"
+# # APEX_COMMANDER_STATE_DIR  = "/var/lib/agentd/apex-commander"
+# # APEX_COMMANDER_CONFIG_DIR = "/etc/apex-commander"
 ```
 
 Notes:
@@ -44,7 +44,7 @@ Notes:
 - State dir holds `audit.jsonl` + screenshots; on multi-user nodes keep it under the
   agentd data root with tight permissions.
 - Secrets never go in this file. Sensitive denylist config:
-  `$APEX_HARNESS_CONFIG_DIR/sensitive.toml`.
+  `$APEX_COMMANDER_CONFIG_DIR/sensitive.toml`.
 
 ## PolicyEngine
 
@@ -63,7 +63,7 @@ PolicyEngine.
 Ship or symlink:
 
 ```
-ApexDesktopHarness-RS/skills/apex-desktop-harness/SKILL.md
+ApexCommander-RS/skills/apex-commander/SKILL.md
 ```
 
 into the agent's skill search path (Hermes/Apex skill dirs as appropriate). The skill
@@ -72,15 +72,15 @@ encodes the efficiency rules (shell → a11y → element actions → coordinates
 ## Acceptance smoke (agent or human)
 
 ```sh
-apex-harness doctor
-apex-harness selftest                 # non-mutating
-apex-harness selftest --confirm       # + mouse wiggle if ydotool/xdotool present
+apex-commander doctor
+apex-commander selftest                 # non-mutating
+apex-commander selftest --confirm       # + mouse wiggle if ydotool/xdotool present
 
 # PRD happy path without screenshots:
-apex-harness list-windows
-apex-harness snapshot --name geany --max-depth 4
-apex-harness --json find --name geany --role button --element-name New
-apex-harness --json do-action --id '…' --action Click
+apex-commander list-windows
+apex-commander snapshot --name geany --max-depth 4
+apex-commander --json find --name geany --role button --element-name New
+apex-commander --json do-action --id '…' --action Click
 # type_into when a text field id is known
 # screenshot only as fallback
 ```
@@ -90,8 +90,8 @@ apex-harness --json do-action --id '…' --action Click
 ```json
 {
   "mcpServers": {
-    "apex-harness": {
-      "command": "/home/andre/Projects/ApexDesktopHarness-RS/target/release/apex-harness-mcp",
+    "apex-commander": {
+      "command": "/home/andre/Projects/ApexCommander-RS/target/release/apex-commander-mcp",
       "args": []
     }
   }

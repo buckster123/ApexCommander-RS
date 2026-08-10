@@ -46,7 +46,7 @@
   input tools.
 
 - **Sensitive denylist is substring + local only.** It does not replace ApexOS PolicyEngine
-  approval. Patterns live in defaults + optional `~/.config/apex-harness/sensitive.toml`.
+  approval. Patterns live in defaults + optional `~/.config/apex-commander/sensitive.toml`.
 
 ## Compositor / DE matrix (S4)
 

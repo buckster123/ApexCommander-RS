@@ -1,4 +1,4 @@
-//! Apex Desktop Harness — core library.
+//! Apex Commander — core library.
 //!
 //! Agent hands for Linux: AT-SPI-first perception and action, with real input
 //! injection and scoped screenshots as fallback. All logic lives here; the
@@ -24,7 +24,7 @@ pub mod types;
 pub mod wait;
 
 /// Crate / product name used in logs, MCP `serverInfo`, and CLI `--version`.
-pub const NAME: &str = "apex-harness";
+pub const NAME: &str = "apex-commander";
 
 /// Semver string from Cargo package metadata.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

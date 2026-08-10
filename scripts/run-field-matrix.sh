@@ -13,15 +13,15 @@ TAG="${FAMILY}-${STYPE}"
 OUT_DIR="$ROOT/docs/field-evidence"
 mkdir -p "$OUT_DIR"
 
-echo "==> Building apex-harness-cli"
-cargo build -q -p apex-harness-cli
+echo "==> Building apex-commander-cli"
+cargo build -q -p apex-commander-cli
 
 JSON_OUT="$OUT_DIR/${TAG}.json"
 MD_OUT="$OUT_DIR/${TAG}.md"
 
 echo "==> field-report → $JSON_OUT"
 # markdown section on stderr, JSON on stdout
-cargo run -q -p apex-harness-cli -- field-report --markdown \
+cargo run -q -p apex-commander-cli -- field-report --markdown \
   2> "$MD_OUT" \
   > "$JSON_OUT"
 

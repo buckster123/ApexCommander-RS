@@ -1,10 +1,10 @@
 [package]
-name = "apex-harness"
+name = "apex-commander"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Apex Desktop Harness core — AT-SPI-first desktop control for agents"
+description = "Apex Commander core — AT-SPI-first desktop control for agents"
 
 [dependencies]
 anyhow.workspace = true

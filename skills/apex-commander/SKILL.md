@@ -1,17 +1,17 @@
 ---
-name: apex-desktop-harness
+name: apex-commander
 description: >-
   Linux desktop computer-use via AT-SPI (eyes + hands). Prefer shell and native
-  tools first; use this harness for other apps' GUIs. MCP server apex-harness-mcp
-  or CLI apex-harness.
+  tools first; use this harness for other apps' GUIs. MCP server apex-commander-mcp
+  or CLI apex-commander.
 ---
 
-# Apex Desktop Harness — agent skill
+# Apex Commander — agent skill
 
 Give agents **real computer-use** on a Linux desktop without defaulting to
 screenshot → vision → coordinate loops.
 
-**Binary / MCP:** `apex-harness-mcp` (stdio) · CLI `apex-harness`  
+**Binary / MCP:** `apex-commander-mcp` (stdio) · CLI `apex-commander`  
 **Ids:** `{bus}|{object_path}` (e.g. `:1.11|/org/a11y/atspi/accessible/968`)
 
 ## Efficiency rules (non-negotiable)
@@ -53,7 +53,7 @@ doctor
 
 - Mutating tools are annotated (`readOnlyHint` / `destructiveHint`) for PolicyEngine.
 - Local **sensitive-app denylist** blocks password managers / keyrings by title/app name.
-- Every mutation appends to `~/.local/share/apex-harness/audit.jsonl` (or `$APEX_HARNESS_STATE_DIR`).
+- Every mutation appends to `~/.local/share/apex-commander/audit.jsonl` (or `$APEX_COMMANDER_STATE_DIR`).
 - Prefer `selftest` without `confirm_mutate` in automation; enable mutate only with human consent.
 
 ## Failure recovery

@@ -44,7 +44,7 @@ pub struct SensitiveConfig {
 }
 
 impl SensitiveConfig {
-    /// Load from `$APEX_HARNESS_CONFIG_DIR/sensitive.toml` if present, else defaults.
+    /// Load from `$APEX_COMMANDER_CONFIG_DIR/sensitive.toml` if present, else defaults.
     pub fn load() -> Self {
         let path = config_dir().join("sensitive.toml");
         Self::load_from(&path).unwrap_or_default()

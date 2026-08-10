@@ -83,7 +83,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "apex-harness"
+name = "apex-commander"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -104,11 +104,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "apex-harness-cli"
+name = "apex-commander-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "apex-harness",
+ "apex-commander",
  "clap",
  "serde",
  "serde_json",
@@ -118,11 +118,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "apex-harness-mcp"
+name = "apex-commander-mcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "apex-harness",
+ "apex-commander",
  "serde",
  "serde_json",
  "tokio",

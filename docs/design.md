@@ -1,4 +1,4 @@
-# ApexDesktopHarness-RS — the contract
+# ApexCommander-RS — the contract
 
 > **Contract first** (house doctrine #1). This document is pinned **before** the code it
 > describes. Code follows this doc; a PR that changes behaviour updates this doc in the same
@@ -30,12 +30,12 @@
 ```
 Agent (agentd / MCP host / shell)
         │
-        ├─ MCP stdio  (apex-harness-mcp)     ← primary for ApexOS-RS
-        ├─ CLI        (apex-harness)         ← humans + scripts
+        ├─ MCP stdio  (apex-commander-mcp)     ← primary for ApexOS-RS
+        ├─ CLI        (apex-commander)         ← humans + scripts
         └─ Optional warm daemon (post-v1)    ← Unix socket + token
                 │
                 ▼
-        apex-harness core
+        apex-commander core
                 │
     ┌───────────┼───────────┬──────────────┐
     ▼           ▼           ▼              ▼
@@ -82,7 +82,7 @@ capabilities; the public tool surface stays stable across compositors.
 
 \*Screenshot is read-only w.r.t. the desktop but may write a file under the state dir.
 
-CLI mirrors the same verbs as subcommands (`apex-harness doctor`, `apex-harness snapshot …`)
+CLI mirrors the same verbs as subcommands (`apex-commander doctor`, `apex-commander snapshot …`)
 with `--json` for machine-readable stdout.
 
 ### Result shapes (shared)
@@ -123,7 +123,7 @@ Faces map `HarnessError` variants:
 
 ## Types
 
-Core shared types live in `apex_harness::types` and are **serde load-bearing**:
+Core shared types live in `apex_commander::types` and are **serde load-bearing**:
 
 | Type | Role |
 |---|---|
@@ -182,15 +182,15 @@ Every mutating tool appends one JSONL line to the audit log:
 }
 ```
 
-Path: `$APEX_HARNESS_STATE_DIR/audit.jsonl` (default `~/.local/share/apex-harness/audit.jsonl`).
+Path: `$APEX_COMMANDER_STATE_DIR/audit.jsonl` (default `~/.local/share/apex-commander/audit.jsonl`).
 
 ## Environment
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `APEX_HARNESS_STATE_DIR` | `~/.local/share/apex-harness` | Audit log, tokens, screenshot drops |
-| `APEX_HARNESS_CONFIG_DIR` | `~/.config/apex-harness` | Sensitive-app list, policy overlays |
-| `APEX_HARNESS_LOG` | `info` (faces may default `warn` for CLI) | `tracing` filter via env (also `RUST_LOG`) |
+| `APEX_COMMANDER_STATE_DIR` | `~/.local/share/apex-commander` | Audit log, tokens, screenshot drops |
+| `APEX_COMMANDER_CONFIG_DIR` | `~/.config/apex-commander` | Sensitive-app list, policy overlays |
+| `APEX_COMMANDER_LOG` | `info` (faces may default `warn` for CLI) | `tracing` filter via env (also `RUST_LOG`) |
 | `DISPLAY` / `WAYLAND_DISPLAY` | session | Session detection |
 | `XDG_CURRENT_DESKTOP` | session | Desktop hint for `doctor` |
 
@@ -229,12 +229,12 @@ never go in the repo; token files are `0600`.
 ## Integration notes (ApexOS-RS)
 
 Preferred registration: MCP plugin stdio entry in `plugins.toml` pointing at the release
-binary `apex-harness-mcp`. High-risk tools route through existing PolicyEngine / approval UI.
+binary `apex-commander-mcp`. High-risk tools route through existing PolicyEngine / approval UI.
 Screenshots and audit events may be ingested into Cerebro by the host — the harness does not
 embed Cerebro.
 
 **Full template + install path:** [`apexos-integration.md`](apexos-integration.md).  
-**Agent efficiency rules:** [`../skills/apex-desktop-harness/SKILL.md`](../skills/apex-desktop-harness/SKILL.md).
+**Agent efficiency rules:** [`../skills/apex-commander/SKILL.md`](../skills/apex-commander/SKILL.md).
 
 Standalone is first-class: any MCP host or shell script can use the same surface with zero
 ApexOS dependency.
@@ -247,5 +247,5 @@ Carried from the PRD; resolve with a charter amendment when decided:
 2. Whether a small batch/expression language is worth it (lean: discrete tools first).
 3. Presence-indicator implementation (overlay vs compositor-specific vs none in v1).
 4. Sensitive-app heuristics depth (title/class lists vs a11y password-field detection).
-5. Exact repo/crate name longevity (`ApexDesktopHarness-RS` is the folder; binary/crate is
-   `apex-harness` — rename of the git remote/title is allowed later without breaking the crate).
+5. Exact repo/crate name longevity (`ApexCommander-RS` is the folder; binary/crate is
+   `apex-commander` — rename of the git remote/title is allowed later without breaking the crate).

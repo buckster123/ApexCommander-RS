@@ -1,4 +1,4 @@
-//! `apex-harness` — human/ops CLI face.
+//! `apex-commander` — human/ops CLI face.
 //!
 //! Thin over the core library: parse arguments, call one function, render the result.
 //! No domain logic lives here.
@@ -8,20 +8,20 @@ use std::process::ExitCode;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
-use apex_harness::a11y::{
+use apex_commander::a11y::{
     activate, click_element, do_action, find_elements, focused_element, frontmost, list_apps,
     list_windows, set_value, snapshot, type_into, AtspiSession,
 };
-use apex_harness::capture::screenshot;
-use apex_harness::doctor::run_doctor;
-use apex_harness::error::HarnessError;
-use apex_harness::field::{markdown_summary, run_field_report};
-use apex_harness::input::{key, mouse_click, mouse_move, type_text};
-use apex_harness::launch::launch_app;
-use apex_harness::selftest::{run_selftest, SelftestOpts};
-use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
-use apex_harness::wait::{wait_for_element, wait_for_stable, wait_ms};
-use apex_harness::{NAME, VERSION};
+use apex_commander::capture::screenshot;
+use apex_commander::doctor::run_doctor;
+use apex_commander::error::HarnessError;
+use apex_commander::field::{markdown_summary, run_field_report};
+use apex_commander::input::{key, mouse_click, mouse_move, type_text};
+use apex_commander::launch::launch_app;
+use apex_commander::selftest::{run_selftest, SelftestOpts};
+use apex_commander::types::{FindQuery, SnapshotOpts, TargetRef};
+use apex_commander::wait::{wait_for_element, wait_for_stable, wait_ms};
+use apex_commander::{NAME, VERSION};
 
 #[derive(Parser)]
 #[command(
@@ -594,7 +594,7 @@ fn emit<T: serde::Serialize>(value: &T, _json: bool) -> Result<()> {
     Ok(())
 }
 
-fn print_tree(node: &apex_harness::types::A11yNode, indent: usize) {
+fn print_tree(node: &apex_commander::types::A11yNode, indent: usize) {
     let pad = "  ".repeat(indent);
     let name = node
         .name

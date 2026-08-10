@@ -1,18 +1,18 @@
 # Field matrix — compositor / DE coverage
 
-S4 ledger. A row is **PASS** only when `apex-harness field-report` was run **inside that
+S4 ledger. A row is **PASS** only when `apex-commander field-report` was run **inside that
 live session** and returned `ok: true`. Host lacks a DE ⇒ row stays **PENDING** with
 install/session notes — never fake a green cell.
 
 ## How to run
 
 ```sh
-cd ~/Projects/ApexDesktopHarness-RS
-cargo build -p apex-harness-cli
+cd ~/Projects/ApexCommander-RS
+cargo build -p apex-commander-cli
 # from the graphical session under test:
 ./scripts/run-field-matrix.sh
 # or:
-cargo run -q -p apex-harness-cli -- field-report --markdown \
+cargo run -q -p apex-commander-cli -- field-report --markdown \
   > docs/field-evidence/<family>-<host>.json
 # markdown section also on stderr — paste under the matching DE below
 ```
@@ -62,7 +62,7 @@ Raw JSON: [`field-evidence/gnome-ubuntu-wayland.json`](field-evidence/gnome-ubun
   - `activate_grab_focus` **ok** — GrabFocus returned false on Some("untitled - Geany") — GrabFocus returned false — window may not accept focus
   - `snapshot` **ok** — role=frame nodes=60 truncated=true max_depth_hit=true
   - `find_button` **ok** — 3 button(s); first=Some("Minimize")
-  - `screenshot` **ok** — backend=xdg-desktop-portal scope=window bytes=1464552 path=/home/andre/.local/share/apex-harness/screenshots/shot-20260810T190147.857.png
+  - `screenshot` **ok** — backend=xdg-desktop-portal scope=window bytes=1464552 path=/home/andre/.local/share/apex-commander/screenshots/shot-20260810T190147.857.png
   - `compositor_helpers` **ok** — {"gio": true, "gnome-screenshot": true, "grim": false, "gtk-launch": true, "hyprctl": false, "i3-msg": false, "kdotool": false, "qdbus": false, "qdbus6": false, "slurp": false, "swaymsg": false, "wtype": false, "xdotool": false, "ydotool": false}
 - **Summary:** field ok on gnome (ubuntu:GNOME) — apps=13 windows=20 toolkits={"clutter": 1, "gtk": 12}
 

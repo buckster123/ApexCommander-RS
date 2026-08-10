@@ -1,6 +1,6 @@
 //! Mutation audit log — JSONL append-only trail.
 //!
-//! Path: `$APEX_HARNESS_STATE_DIR/audit.jsonl` (default under XDG data).
+//! Path: `$APEX_COMMANDER_STATE_DIR/audit.jsonl` (default under XDG data).
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn append_writes_jsonl() {
         let dir = tempdir().unwrap();
-        std::env::set_var("APEX_HARNESS_STATE_DIR", dir.path());
+        std::env::set_var("APEX_COMMANDER_STATE_DIR", dir.path());
         let e = AuditEvent {
             ts: Utc::now().to_rfc3339(),
             tool: "type_into".into(),
@@ -116,6 +116,6 @@ mod tests {
         append(&e).unwrap();
         let body = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
         assert_eq!(body.lines().count(), 2);
-        std::env::remove_var("APEX_HARNESS_STATE_DIR");
+        std::env::remove_var("APEX_COMMANDER_STATE_DIR");
     }
 }

@@ -2,28 +2,28 @@
 
 use std::path::PathBuf;
 
-/// Default state root: `$APEX_HARNESS_STATE_DIR` or `~/.local/share/apex-harness`.
+/// Default state root: `$APEX_COMMANDER_STATE_DIR` or `~/.local/share/apex-commander`.
 pub fn state_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("APEX_HARNESS_STATE_DIR") {
+    if let Ok(p) = std::env::var("APEX_COMMANDER_STATE_DIR") {
         if !p.is_empty() {
             return PathBuf::from(p);
         }
     }
-    directories::ProjectDirs::from("com", "buckster123", "apex-harness")
+    directories::ProjectDirs::from("com", "buckster123", "apex-commander")
         .map(|d| d.data_local_dir().to_path_buf())
-        .unwrap_or_else(|| PathBuf::from(".").join("apex-harness-state"))
+        .unwrap_or_else(|| PathBuf::from(".").join("apex-commander-state"))
 }
 
-/// Config root: `$APEX_HARNESS_CONFIG_DIR` or `~/.config/apex-harness`.
+/// Config root: `$APEX_COMMANDER_CONFIG_DIR` or `~/.config/apex-commander`.
 pub fn config_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("APEX_HARNESS_CONFIG_DIR") {
+    if let Ok(p) = std::env::var("APEX_COMMANDER_CONFIG_DIR") {
         if !p.is_empty() {
             return PathBuf::from(p);
         }
     }
-    directories::ProjectDirs::from("com", "buckster123", "apex-harness")
+    directories::ProjectDirs::from("com", "buckster123", "apex-commander")
         .map(|d| d.config_dir().to_path_buf())
-        .unwrap_or_else(|| PathBuf::from(".").join("apex-harness-config"))
+        .unwrap_or_else(|| PathBuf::from(".").join("apex-commander-config"))
 }
 
 /// Ensure state dir exists; return it.

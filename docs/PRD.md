@@ -1,9 +1,9 @@
-**Apex Desktop Harness (ADH)**  
+**Apex Commander (ADH)**  
 **Clean-room Product Requirements Document**  
 Version 0.1 · 2026-08-10  
 Status: Ready for implementation planning  
 
-**Working title / binary:** `apex-harness` (crate `apex-desktop` or `apex-harness`)  
+**Working title / binary:** `apex-commander` (crate `apex-desktop` or `apex-commander`)  
 **Tagline:** Agent hands for Linux (Windows later) — AT-SPI-first desktop control that gives ApexOS-RS agents real computer-use powers.
 
 This is an independent clean-room design. It is inspired by the *capabilities and philosophy* of [xfreeze2/desktop-harness](https://github.com/xfreeze2/desktop-harness) (macOS AX-tree-first CLI + skill for agents) but shares no code, no exact internal structure, and is re-architected for pure Rust, Linux (primary), and deep integration with [buckster123/ApexOS-RS](https://github.com/buckster123/ApexOS-RS).
@@ -16,7 +16,7 @@ Coding and embodied agents are strong at shell, files, git, and APIs, but weak a
 
 macOS already exposes a rich Accessibility (AX) tree. Linux exposes the equivalent via **AT-SPI2** (Assistive Technology Service Provider Interface) over D-Bus. Most GTK, Qt, Firefox, Electron (with accessibility enabled), and many other toolkits publish structured role/name/value/state/action information.
 
-**Apex Desktop Harness** turns that into reliable agent “eyes + hands”:
+**Apex Commander** turns that into reliable agent “eyes + hands”:
 
 - Prefer the accessibility tree for perception and actions.
 - Fall back to scoped screenshots only when the tree is empty or insufficient (custom canvases, games, poorly instrumented apps).
@@ -142,7 +142,7 @@ Agent (agentd / MCP host / shell)
         └─ Optional warm daemon (Unix socket + token)
                 │
                 ▼
-        apex-harness core (pure Rust)
+        apex-commander core (pure Rust)
                 │
     ┌───────────┼───────────┬──────────────┐
     ▼           ▼           ▼              ▼
@@ -171,7 +171,7 @@ Because ApexOS agents can self-modify, control hardware, and persist memory, the
 
 - **Sensitive-app denylist** (configurable): password managers, keyrings, banking-looking windows, etc. Block open/focus + mutations while they are frontmost or targeted unless explicitly overridden.
 - **Policy integration:** Mutating tools carry annotations so Apex’s PolicyEngine can force human approval (especially for type/click sequences that look like send/post/pay/delete).
-- **Audit log:** `~/.apex-harness/audit.jsonl` (or under Apex’s preferred state dir) for every mutation.
+- **Audit log:** `~/.apex-commander/audit.jsonl` (or under Apex’s preferred state dir) for every mutation.
 - **Daemon auth:** Owner-only Unix socket + short-lived or file-based token (0600).
 - **No network exposure.**
 - **Physical override:** Real user mouse/keyboard input is never blocked.
@@ -211,7 +211,7 @@ Because ApexOS agents can self-modify, control hardware, and persist memory, the
 
 ### 10. Success Metrics / Acceptance
 
-- `apex-harness doctor` produces a clear readiness report on a stock GNOME, KDE, and Hyprland session.
+- `apex-commander doctor` produces a clear readiness report on a stock GNOME, KDE, and Hyprland session.
 - `selftest` passes (visible mouse movement + safe interaction) when permissions are correct.
 - An ApexOS agent can, without screenshots in the common case:
   - discover the frontmost app,

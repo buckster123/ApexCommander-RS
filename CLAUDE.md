@@ -1,4 +1,4 @@
-# ApexDesktopHarness-RS — Agent & Developer Guide
+# ApexCommander-RS — Agent & Developer Guide
 
 > Agent hands for Linux — AT-SPI-first desktop control (screenshots only as fallback).
 > Shape: core lib + MCP stdio face + CLI; optional warm daemon is post-v1.
@@ -28,9 +28,9 @@ wins. Safety: sensitive-app denylist, mutation audit log, policy annotations for
 
 ```
 crates/
-  apex-harness/         # core lib — types, doctor, backends, policy. No I/O glue in faces.
-  apex-harness-mcp/     # MCP stdio server — the agent face
-  apex-harness-cli/     # clap CLI — binary name `apex-harness`
+  apex-commander/         # core lib — types, doctor, backends, policy. No I/O glue in faces.
+  apex-commander-mcp/     # MCP stdio server — the agent face
+  apex-commander-cli/     # clap CLI — binary name `apex-commander`
 docs/design.md          # THE contract — tools, types, invariants
 docs/CHARTER.md         # binding decisions D1–D12
 docs/PRD.md             # product requirements (intent + roadmap)
@@ -45,7 +45,7 @@ The load-bearing summary; **`docs/CHARTER.md` D1–D12 is the binding long form.
 **Locked means locked — do not re-litigate these mid-session; amend deliberately, with a date.**
 
 - **Language**: Rust — one Cargo workspace, every binary in it
-- **Shape**: standalone sibling (`apex-harness` + `-mcp` + `-cli`); not an ApexOS in-tree crate (D1, D3)
+- **Shape**: standalone sibling (`apex-commander` + `-mcp` + `-cli`); not an ApexOS in-tree crate (D1, D3)
 - **Clean-room**: no third-party harness code or schemas (D2)
 - **AT-SPI primary, pixels secondary** (D4, D11)
 - **Backend traits**, stable agent-facing tools (D5)
@@ -98,12 +98,12 @@ Full rationale: `~/Projects/Launchpad-RS/docs/house-doctrine.md`. The nine, cond
 ## Cerebro session protocol (mandatory)
 
 All Cerebro MCP calls use agent `FORGE` (`agent_id="FORGE"`) — or the agent actually doing
-the work; keep tags `project:ApexDesktopHarness-RS`. Full tool menu:
+the work; keep tags `project:ApexCommander-RS`. Full tool menu:
 `~/Projects/Launchpad-RS/docs/cerebro-protocol.md`.
 
 **Session START** — before touching any code:
 ```
-session_recall(query="ApexDesktopHarness-RS build status step progress", agent_id="FORGE")
+session_recall(query="ApexCommander-RS build status step progress", agent_id="FORGE")
 ```
 
 **Session END** (and at milestones on long sessions):
@@ -126,15 +126,15 @@ cargo fmt --all && cargo clippy --workspace -- -D warnings
 cargo build --release --workspace
 
 # Human face — eyes + hands (S1–S2)
-cargo run -p apex-harness-cli -- doctor
-cargo run -p apex-harness-cli -- list-windows
-cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
-cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
-cargo run -p apex-harness-cli -- --json screenshot --full
-cargo run -p apex-harness-cli -- selftest
-cargo run -p apex-harness-cli -- field-report --markdown
+cargo run -p apex-commander-cli -- doctor
+cargo run -p apex-commander-cli -- list-windows
+cargo run -p apex-commander-cli -- snapshot --name geany --max-depth 4
+cargo run -p apex-commander-cli -- --json find --name geany --role button --max-results 10
+cargo run -p apex-commander-cli -- --json screenshot --full
+cargo run -p apex-commander-cli -- selftest
+cargo run -p apex-commander-cli -- field-report --markdown
 ./scripts/run-field-matrix.sh   # saves docs/field-evidence/<session>.json
-cargo run -p apex-harness-cli -- launch org.gnome.Calculator
+cargo run -p apex-commander-cli -- launch org.gnome.Calculator
 # do-action / type-into need a live element id from find
 
 # MCP smoke (stdout is JSON-RPC only)
@@ -143,7 +143,7 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_windows","arguments":{}}}' \
-  | cargo run -q -p apex-harness-mcp
+  | cargo run -q -p apex-commander-mcp
 ```
 
 No systemd unit in v1 (not a permanent daemon). When the optional daemon lands, follow
@@ -180,7 +180,7 @@ Project-specific (will grow in S1+):
 | `docs/PRD.md` | Product intent, acceptance criteria, roadmap narrative |
 | `docs/apexos-integration.md` | plugins.toml + install path for ApexOS-RS |
 | `docs/field-matrix.md` | GNOME/Plasma/Hyprland field ledger |
-| `skills/apex-desktop-harness/SKILL.md` | Agent efficiency rules + tool cheatsheet |
+| `skills/apex-commander/SKILL.md` | Agent efficiency rules + tool cheatsheet |
 | `docs/gotchas.md` | **Any subsystem change — grep it first** |
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
 

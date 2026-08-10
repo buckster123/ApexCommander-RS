@@ -1,18 +1,18 @@
 [package]
-name = "apex-harness-cli"
+name = "apex-commander-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Apex Desktop Harness CLI — human/ops face"
+description = "Apex Commander CLI — human/ops face"
 
 [[bin]]
-name = "apex-harness"
+name = "apex-commander"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
-apex-harness = { path = "../apex-harness" }
+apex-commander = { path = "../apex-commander" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

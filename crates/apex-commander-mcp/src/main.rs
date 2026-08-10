@@ -1,4 +1,4 @@
-//! `apex-harness-mcp` — MCP-over-stdio agent face.
+//! `apex-commander-mcp` — MCP-over-stdio agent face.
 //!
 //! Protocol `2024-11-05`, hand-rolled newline-delimited JSON-RPC.
 //! **stdout is sacred** (JSON-RPC only). All tracing → stderr.
@@ -9,19 +9,19 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
-use apex_harness::a11y::{
+use apex_commander::a11y::{
     activate, do_action, find_elements, focused_element, frontmost, list_apps, list_windows,
     set_value, snapshot, type_into, AtspiSession,
 };
-use apex_harness::capture::screenshot;
-use apex_harness::doctor::run_doctor;
-use apex_harness::field::run_field_report;
-use apex_harness::input::{key, mouse_click, mouse_move, type_text};
-use apex_harness::launch::launch_app;
-use apex_harness::selftest::{run_selftest, SelftestOpts};
-use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
-use apex_harness::wait::{wait_for_element, wait_for_stable, wait_ms};
-use apex_harness::{NAME, VERSION};
+use apex_commander::capture::screenshot;
+use apex_commander::doctor::run_doctor;
+use apex_commander::field::run_field_report;
+use apex_commander::input::{key, mouse_click, mouse_move, type_text};
+use apex_commander::launch::launch_app;
+use apex_commander::selftest::{run_selftest, SelftestOpts};
+use apex_commander::types::{FindQuery, SnapshotOpts, TargetRef};
+use apex_commander::wait::{wait_for_element, wait_for_stable, wait_ms};
+use apex_commander::{NAME, VERSION};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
@@ -36,7 +36,11 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    info!(name = NAME, version = VERSION, "apex-harness-mcp starting");
+    info!(
+        name = NAME,
+        version = VERSION,
+        "apex-commander-mcp starting"
+    );
 
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();

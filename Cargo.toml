@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/buckster123/ApexDesktopHarness-RS"
+repository = "https://github.com/buckster123/ApexCommander-RS"
 version = "0.1.0"
 
 [workspace.dependencies]
