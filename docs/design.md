@@ -69,9 +69,11 @@ capabilities; the public tool surface stays stable across compositors.
 | `snapshot` | Compact a11y tree (max_depth + max_nodes; bounds + actions) | read-only | **S1 live** |
 | `find_elements` | Semantic selectors (role + name/text/state) under a target | read-only | **S1 live** |
 | `focused_element` | Details of the currently focused a11y node under a target | read-only | **S1 live** |
-| `do_action` / `click_element` / `set_value` / `type_into` | Prefer AT-SPI actions and value interfaces | mutating | planned S2 |
-| `mouse_*` / `key_*` / `type_text` / `scroll` / `drag` | Real input injection fallback | mutating | planned S2 |
-| `screenshot` | Window / region / display capture → path or base64 | read-only* | planned S2 |
+| `do_action` / `click_element` | AT-SPI action by name/index (default Click) | mutating | **S2 live** |
+| `type_into` | EditableText set/append | mutating | **S2 live** |
+| `set_value` | Value interface (slider/spin) | mutating | **S2 live** |
+| `mouse_move` / `mouse_click` / `type_text` / `key` | Real input via ydotool/xdotool/wtype when installed | mutating | **S2 live** (probe) |
+| `screenshot` | Display or window-crop → path under state dir | read-only* | **S2 live** |
 | `wait` / `wait_for_element` | Stability / presence helpers | read-only | planned S3 |
 | `selftest` | Non-destructive smoke (wiggle + type needs confirm) | mutating | planned S3 |
 
@@ -134,6 +136,9 @@ Core shared types live in `apex_harness::types` and are **serde load-bearing**:
 | `ElementHit` | Find result with breadcrumb `path` |
 | `TargetRef` | `id` \| `name` \| `pid` \| `frontmost` |
 | `ActivateResult` | `{ ok, id, title?, detail }` |
+| `ActionResult` | `{ ok, id, action?, detail }` for do_action / type_into / set_value |
+| `ScreenshotResult` | `{ path, scope, backend, bytes, bounds? }` |
+| `InputBackendKind` | `ydotool` \| `xdotool` \| `wtype` \| `none` |
 
 **Ids:** `{bus_unique_name}|{object_path}` (e.g. `:1.11|/org/a11y/atspi/accessible/943`).
 

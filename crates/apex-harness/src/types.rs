@@ -212,6 +212,40 @@ pub enum TargetRef {
     Frontmost,
 }
 
+/// Result of a mutating element action (`do_action`, `type_into`, `set_value`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionResult {
+    pub ok: bool,
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    pub detail: String,
+}
+
+/// Result of a screenshot capture.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScreenshotResult {
+    /// Filesystem path to the PNG (under the state dir by default).
+    pub path: String,
+    /// `display` or `window` (+ optional `+full_fallback` if crop failed).
+    pub scope: String,
+    /// Backend that produced the raw capture.
+    pub backend: String,
+    pub bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<Bounds>,
+}
+
+/// Which coordinate/type injection backend was selected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InputBackendKind {
+    Ydotool,
+    Xdotool,
+    Wtype,
+    None,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

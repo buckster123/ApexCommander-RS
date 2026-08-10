@@ -33,3 +33,17 @@
 
 - **MCP stdout is sacred.** All tracing → stderr. A stray `println!` in the MCP face corrupts
   JSON-RPC.
+
+- **Portal screenshots land a copy under the state dir.** The portal may also leave a file in
+  `~/Pictures`. Don't assume only one path exists; always use the path returned in
+  `ScreenshotResult`.
+
+- **Window crop uses AT-SPI screen extents.** Maximized windows may report full-display bounds
+  — crop then equals full capture. Don't assume crop implies a small ROI.
+
+- **Coordinate input is optional.** Without `ydotool`/`xdotool`/`wtype`, mouse/type_text tools
+  return `Unavailable`. Prefer `do_action` / `type_into`. Don't hard-fail `doctor.ok` on missing
+  input tools.
+
+- **Sensitive denylist is substring + local only.** It does not replace ApexOS PolicyEngine
+  approval. Patterns live in defaults + optional `~/.config/apex-harness/sensitive.toml`.

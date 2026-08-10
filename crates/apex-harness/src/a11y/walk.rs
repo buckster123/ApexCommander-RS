@@ -183,7 +183,8 @@ pub(crate) async fn states_of(proxy: &AccessibleProxy<'_>) -> Vec<String> {
     }
 }
 
-pub(crate) async fn bounds_of(proxy: &AccessibleProxy<'_>) -> Option<Bounds> {
+/// Screen extents via Component interface, if available.
+pub async fn bounds_of(proxy: &AccessibleProxy<'_>) -> Option<Bounds> {
     let proxies = proxy.proxies().await.ok()?;
     let component = proxies.component().await.ok()?;
     let (x, y, w, h) = component.get_extents(CoordType::Screen).await.ok()?;

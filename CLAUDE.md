@@ -125,11 +125,13 @@ cargo test --workspace
 cargo fmt --all && cargo clippy --workspace -- -D warnings
 cargo build --release --workspace
 
-# Human face — eyes (S1)
+# Human face — eyes + hands (S1–S2)
 cargo run -p apex-harness-cli -- doctor
 cargo run -p apex-harness-cli -- list-windows
 cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
 cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
+cargo run -p apex-harness-cli -- --json screenshot --full
+# do-action / type-into need a live element id from find
 
 # MCP smoke (stdout is JSON-RPC only)
 printf '%s\n' \

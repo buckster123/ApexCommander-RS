@@ -15,9 +15,11 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   Wayland: doctor reports `atspi` bus live · 11 apps; geany snapshot shows frame/menu/tool
   bar; `find --name geany --role button` returns Minimize/Restore/Close/New with bounds +
   actions. Note: GrabFocus often false on Wayland (gotcha); compositor raise deferred to S2.
-- [ ] **S2 — hands + capture**: AT-SPI `do_action` / `set_value` / `type_into`; input backend
-  (portal/libei or ydotool/uinput fallback); window-scoped `screenshot`; mutation audit JSONL;
-  sensitive-app denylist stub.
+- [x] **S2 — hands + capture** (2026-08-10): AT-SPI `do_action` / `type_into` / `set_value`;
+  input fallbacks (`ydotool`/`xdotool`/`wtype` when installed); portal screenshot + window
+  crop via a11y bounds; audit JSONL (`~/.local/share/apex-harness/audit.jsonl`); sensitive
+  denylist stub (`policy`). Field: portal shot ok; `do_action Click` on Geany “New” → true
+  + audit line; doctor reports capture=ok input=no (no ydotool). 19 unit tests.
 - [ ] **S3 — agent fit**: remaining MCP tools + wait helpers; `selftest`; skill doc
   (efficiency rules); ApexOS-RS `plugins.toml` integration notes; end-to-end acceptance from
   PRD §10 without screenshots in the happy path.

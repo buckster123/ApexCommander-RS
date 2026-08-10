@@ -10,13 +10,19 @@ description = "Apex Desktop Harness core — AT-SPI-first desktop control for ag
 anyhow.workspace = true
 async-trait.workspace = true
 atspi = { version = "0.30", default-features = true }
+chrono.workspace = true
+directories.workspace = true
+futures-lite = "2"
+image.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid.workspace = true
 zbus = "5"
 
 [dev-dependencies]
 serde_json.workspace = true
+tempfile = "3"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

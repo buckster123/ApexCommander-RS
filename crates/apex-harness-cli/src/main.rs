@@ -9,11 +9,13 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 
 use apex_harness::a11y::{
-    activate, find_elements, focused_element, frontmost, list_apps, list_windows, snapshot,
-    AtspiSession,
+    activate, click_element, do_action, find_elements, focused_element, frontmost, list_apps,
+    list_windows, set_value, snapshot, type_into, AtspiSession,
 };
+use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
 use apex_harness::error::HarnessError;
+use apex_harness::input::{key, mouse_click, mouse_move, type_text};
 use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
 use apex_harness::{NAME, VERSION};
 
@@ -34,7 +36,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Structured readiness report (session, AT-SPI, input, capture, recommendations).
+    /// Structured readiness report.
     Doctor,
     /// List AT-SPI application roots.
     ListApps,
@@ -44,13 +46,10 @@ enum Command {
     Frontmost,
     /// Focus / raise a window (AT-SPI GrabFocus).
     Activate {
-        /// Exact `{bus}|{path}` id.
         #[arg(long)]
         id: Option<String>,
-        /// Case-insensitive substring of window title or app name.
         #[arg(long)]
         name: Option<String>,
-        /// Process id.
         #[arg(long)]
         pid: Option<u32>,
     },
@@ -62,13 +61,10 @@ enum Command {
         name: Option<String>,
         #[arg(long)]
         pid: Option<u32>,
-        /// Use frontmost window.
         #[arg(long)]
         frontmost: bool,
-        /// Max tree depth (default 6).
         #[arg(long, default_value_t = 6)]
         max_depth: u32,
-        /// Max nodes (default 200).
         #[arg(long, default_value_t = 200)]
         max_nodes: u32,
     },
@@ -82,11 +78,8 @@ enum Command {
         pid: Option<u32>,
         #[arg(long)]
         frontmost: bool,
-        /// Role filter (e.g. button, frame).
         #[arg(long)]
         role: Option<String>,
-        /// Name substring (or exact with --name-exact). Element name, not window name —
-        /// use --window-name for the target window.
         #[arg(long)]
         element_name: Option<String>,
         #[arg(long)]
@@ -97,7 +90,6 @@ enum Command {
         state: Option<String>,
         #[arg(long, default_value_t = 25)]
         max_results: u32,
-        /// Window title / app name selector (alias of --name for target).
         #[arg(long)]
         window_name: Option<String>,
     },
@@ -112,7 +104,66 @@ enum Command {
         #[arg(long)]
         frontmost: bool,
     },
-    /// Print version (also available as --version).
+    /// AT-SPI DoAction on an element (prefer over coordinate click).
+    DoAction {
+        /// Element id `{bus}|{path}`.
+        #[arg(long)]
+        id: String,
+        /// Action name (default: Click/Press/Activate or first).
+        #[arg(long)]
+        action: Option<String>,
+        /// Explicit action index.
+        #[arg(long)]
+        index: Option<i32>,
+    },
+    /// Click via AT-SPI (Click action).
+    Click {
+        #[arg(long)]
+        id: String,
+    },
+    /// Set text via EditableText (prefer over type-text).
+    TypeInto {
+        #[arg(long)]
+        id: String,
+        /// Text to set (or append with --append).
+        text: String,
+        #[arg(long)]
+        append: bool,
+    },
+    /// Set a Value interface (slider/spin).
+    SetValue {
+        #[arg(long)]
+        id: String,
+        value: f64,
+    },
+    /// Screenshot (portal / shell / grim). Optional window target for crop.
+    Screenshot {
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        pid: Option<u32>,
+        #[arg(long)]
+        frontmost: bool,
+        /// Full display even if a target is given.
+        #[arg(long)]
+        full: bool,
+    },
+    /// Move pointer (ydotool/xdotool fallback).
+    MouseMove { x: i32, y: i32 },
+    /// Click at coordinates (fallback; prefer do-action).
+    MouseClick {
+        x: i32,
+        y: i32,
+        #[arg(long, default_value_t = 1)]
+        button: u8,
+    },
+    /// Type via real keys (fallback; prefer type-into).
+    TypeText { text: String },
+    /// Key combo (backend-specific, e.g. Return or ctrl+c).
+    Key { keyspec: String },
+    /// Print version.
     Version,
 }
 
@@ -149,8 +200,7 @@ async fn run() -> Result<()> {
         }
         Command::ListApps => {
             let session = AtspiSession::connect().await?;
-            let apps = list_apps(&session).await?;
-            emit(&apps, cli.json)?;
+            emit(&list_apps(&session).await?, cli.json)?;
         }
         Command::ListWindows => {
             let session = AtspiSession::connect().await?;
@@ -176,8 +226,7 @@ async fn run() -> Result<()> {
         }
         Command::Frontmost => {
             let session = AtspiSession::connect().await?;
-            let w = frontmost(&session).await?;
-            emit(&w, cli.json)?;
+            emit(&frontmost(&session).await?, cli.json)?;
         }
         Command::Activate { id, name, pid } => {
             let session = AtspiSession::connect().await?;
@@ -246,8 +295,10 @@ async fn run() -> Result<()> {
                 description: None,
                 max_results,
             };
-            let hits = find_elements(&session, &target, query, SnapshotOpts::default()).await?;
-            emit(&hits, cli.json)?;
+            emit(
+                &find_elements(&session, &target, query, SnapshotOpts::default()).await?,
+                cli.json,
+            )?;
         }
         Command::FocusedElement {
             id,
@@ -261,8 +312,85 @@ async fn run() -> Result<()> {
             } else {
                 Some(target_from_flags(id, name, pid, fm)?)
             };
-            let hit = focused_element(&session, target.as_ref()).await?;
-            emit(&hit, cli.json)?;
+            emit(&focused_element(&session, target.as_ref()).await?, cli.json)?;
+        }
+        Command::DoAction { id, action, index } => {
+            let session = AtspiSession::connect().await?;
+            let result = do_action(&session, &id, action.as_deref(), index).await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(1);
+            }
+        }
+        Command::Click { id } => {
+            let session = AtspiSession::connect().await?;
+            let result = click_element(&session, &id).await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(1);
+            }
+        }
+        Command::TypeInto { id, text, append } => {
+            let session = AtspiSession::connect().await?;
+            let result = type_into(&session, &id, &text, append).await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(1);
+            }
+        }
+        Command::SetValue { id, value } => {
+            let session = AtspiSession::connect().await?;
+            emit(&set_value(&session, &id, value).await?, cli.json)?;
+        }
+        Command::Screenshot {
+            id,
+            name,
+            pid,
+            frontmost: fm,
+            full,
+        } => {
+            let session = AtspiSession::connect().await.ok();
+            let target = if full {
+                None
+            } else if id.is_some() || name.is_some() || pid.is_some() || fm {
+                Some(target_from_flags(id, name, pid, fm)?)
+            } else {
+                None
+            };
+            let result = screenshot(session.as_ref(), target.as_ref()).await?;
+            emit(&result, cli.json)?;
+        }
+        Command::MouseMove { x, y } => {
+            let detail = mouse_move(x, y).await?;
+            if cli.json {
+                println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
+            } else {
+                println!("{detail}");
+            }
+        }
+        Command::MouseClick { x, y, button } => {
+            let detail = mouse_click(x, y, button).await?;
+            if cli.json {
+                println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
+            } else {
+                println!("{detail}");
+            }
+        }
+        Command::TypeText { text } => {
+            let detail = type_text(&text).await?;
+            if cli.json {
+                println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
+            } else {
+                println!("{detail}");
+            }
+        }
+        Command::Key { keyspec } => {
+            let detail = key(&keyspec).await?;
+            if cli.json {
+                println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
+            } else {
+                println!("{detail}");
+            }
         }
         Command::Version => {
             if cli.json {
@@ -303,13 +431,8 @@ fn target_from_flags(
     bail!("need a target: --id, --name, --pid, or --frontmost");
 }
 
-fn emit<T: serde::Serialize>(value: &T, json: bool) -> Result<()> {
-    if json {
-        println!("{}", serde_json::to_string_pretty(value)?);
-    } else {
-        // Human default: pretty JSON still (structured data). List commands may override.
-        println!("{}", serde_json::to_string_pretty(value)?);
-    }
+fn emit<T: serde::Serialize>(value: &T, _json: bool) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
 }
 

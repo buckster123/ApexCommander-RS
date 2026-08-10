@@ -12,7 +12,7 @@ without defaulting to vision loops.</p>
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 <img alt="rust" src="https://img.shields.io/badge/rust-2021-orange?logo=rust&logoColor=white">
 <img alt="ci" src="https://img.shields.io/github/actions/workflow/status/buckster123/ApexDesktopHarness-RS/ci.yml?label=ci">
-<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20eyes-brightgreen">
+<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20hands-brightgreen">
 </p>
 
 </div>
@@ -47,16 +47,18 @@ Binaries: `target/release/apex-harness` (CLI) and `target/release/apex-harness-m
 # Readiness (start here)
 cargo run -p apex-harness-cli -- doctor
 
-# Eyes — discover + compact a11y tree
+# Eyes
 cargo run -p apex-harness-cli -- list-windows
 cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
 cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
 
-# MCP (stdio) — tools/list includes doctor, list_*, snapshot, find_elements, …
+# Hands + capture
+cargo run -p apex-harness-cli -- --json do-action --id ':1.11|/…' --action Click
+cargo run -p apex-harness-cli -- --json screenshot --name geany
 ```
 
-S1 ships AT-SPI eyes. Hands (element actions + real input + screenshots) land in S2 — see
-[`BACKLOG.md`](BACKLOG.md).
+S2 ships AT-SPI hands + portal screenshots + audit log. Wait helpers / selftest / ApexOS
+plugin registration land in S3 — see [`BACKLOG.md`](BACKLOG.md).
 
 ## How it works
 

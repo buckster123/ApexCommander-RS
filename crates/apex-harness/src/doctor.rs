@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::a11y::probe_atspi;
+use crate::capture::probe_capture;
+use crate::input::probe_input;
 use crate::types::{Capability, SessionKind};
 
 /// Full readiness report produced by [`run_doctor`].
@@ -21,7 +23,7 @@ pub struct DoctorReport {
     pub summary: String,
 }
 
-/// Run a best-effort environment probe (async — probes live AT-SPI).
+/// Run a best-effort environment probe (async — probes live AT-SPI / capture).
 pub async fn run_doctor() -> DoctorReport {
     let session = detect_session();
     let desktop = detect_desktop();
@@ -40,27 +42,30 @@ pub async fn run_doctor() -> DoctorReport {
 
     let atspi_cap = probe_atspi().await;
     let atspi_ok = atspi_cap.available;
+    let input_cap = probe_input();
+    let capture_cap = probe_capture().await;
 
     let capabilities = vec![
         session_cap,
         atspi_cap,
-        Capability {
-            name: "input".into(),
-            available: false,
-            detail: Some("not wired yet (S2)".into()),
-        },
-        Capability {
-            name: "capture".into(),
-            available: false,
-            detail: Some("not wired yet (S2)".into()),
-        },
+        input_cap.clone(),
+        capture_cap.clone(),
         Capability {
             name: "window_backend".into(),
             available: atspi_ok,
             detail: Some(if atspi_ok {
-                "via AT-SPI application/frame roots (S1)".into()
+                "via AT-SPI application/frame roots".into()
             } else {
                 "depends on AT-SPI".into()
+            }),
+        },
+        Capability {
+            name: "element_actions".into(),
+            available: atspi_ok,
+            detail: Some(if atspi_ok {
+                "do_action / type_into / set_value via AT-SPI".into()
+            } else {
+                "requires AT-SPI".into()
             }),
         },
     ];
@@ -77,16 +82,29 @@ pub async fn run_doctor() -> DoctorReport {
                 .into(),
         );
     } else {
-        recommendations
-            .push("AT-SPI eyes ready: try `list-windows`, `snapshot --name <app>`, `find`.".into());
+        recommendations.push(
+            "Prefer do_action / type_into over coordinate clicks; snapshot before find.".into(),
+        );
     }
-    recommendations.push("Input injection + screenshots land in S2 — see BACKLOG.md.".into());
+    if !input_cap.available {
+        recommendations.push(
+            "No ydotool/xdotool/wtype — coordinate input unavailable; AT-SPI hands still work."
+                .into(),
+        );
+    }
+    if !capture_cap.available {
+        recommendations
+            .push("No screenshot backend — install xdg-desktop-portal and/or grim.".into());
+    }
 
+    // Ready for GUI work when we have a session + AT-SPI (hands/eyes). Capture is bonus.
     let ok = session_ok && atspi_ok;
     let summary = if ok {
         format!(
-            "session={session:?} desktop={} — AT-SPI ready (input/capture still S2)",
-            desktop.as_deref().unwrap_or("unknown")
+            "session={session:?} desktop={} — AT-SPI hands+eyes ready; capture={} input={}",
+            desktop.as_deref().unwrap_or("unknown"),
+            if capture_cap.available { "ok" } else { "no" },
+            if input_cap.available { "ok" } else { "no" },
         )
     } else if !session_ok {
         "no graphical session detected — cannot drive a desktop from here".into()

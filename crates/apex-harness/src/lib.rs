@@ -10,8 +10,13 @@
 #![deny(unsafe_code)]
 
 pub mod a11y;
+pub mod audit;
+pub mod capture;
 pub mod doctor;
 pub mod error;
+pub mod input;
+pub mod paths;
+pub mod policy;
 pub mod types;
 
 /// Crate / product name used in logs, MCP `serverInfo`, and CLI `--version`.

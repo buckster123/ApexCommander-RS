@@ -10,10 +10,12 @@ use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
 use apex_harness::a11y::{
-    activate, find_elements, focused_element, frontmost, list_apps, list_windows, snapshot,
-    AtspiSession,
+    activate, do_action, find_elements, focused_element, frontmost, list_apps, list_windows,
+    set_value, snapshot, type_into, AtspiSession,
 };
+use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
+use apex_harness::input::{key, mouse_click, mouse_move, type_text};
 use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
 use apex_harness::{NAME, VERSION};
 
@@ -206,6 +208,122 @@ fn tool_schemas() -> Vec<Value> {
             true,
             false,
         ),
+        tool(
+            "do_action",
+            "AT-SPI DoAction on an element by id. Prefer over coordinate clicks. Optional action name (Click/Press/…) or index.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string","description":"{bus}|{path}"},
+                    "action":{"type":"string"},
+                    "index":{"type":"integer"}
+                },
+                "required":["id"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "type_into",
+            "Set or append text via EditableText on an element id. Prefer over type_text key injection.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string"},
+                    "text":{"type":"string"},
+                    "append":{"type":"boolean"}
+                },
+                "required":["id","text"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "set_value",
+            "Set a numeric Value interface (slider/spin) on an element id.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string"},
+                    "value":{"type":"number"}
+                },
+                "required":["id","value"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "screenshot",
+            "Capture display (or window crop via bounds). Uses xdg-desktop-portal when available. Returns path under state dir.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string"},
+                    "name":{"type":"string"},
+                    "pid":{"type":"integer"},
+                    "frontmost":{"type":"boolean"},
+                    "full":{"type":"boolean","description":"force full display"}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+        ),
+        tool(
+            "mouse_move",
+            "Move pointer to absolute coords via ydotool/xdotool. Prefer do_action when possible.",
+            json!({
+                "type":"object",
+                "properties":{"x":{"type":"integer"},"y":{"type":"integer"}},
+                "required":["x","y"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "mouse_click",
+            "Click at absolute coords (fallback). Prefer do_action.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "x":{"type":"integer"},
+                    "y":{"type":"integer"},
+                    "button":{"type":"integer","description":"1=left 2=middle 3=right"}
+                },
+                "required":["x","y"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "type_text",
+            "Type via real key events (fallback). Prefer type_into on EditableText.",
+            json!({
+                "type":"object",
+                "properties":{"text":{"type":"string"}},
+                "required":["text"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "key",
+            "Send a key/combo via input backend (syntax backend-specific).",
+            json!({
+                "type":"object",
+                "properties":{"key":{"type":"string"}},
+                "required":["key"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
     ]
 }
 
@@ -319,8 +437,99 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             };
             ok_json(&focused_element(&s, target.as_ref()).await.map_err(err_str)?)
         }
+        "do_action" => {
+            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let id = str_arg(&args, "id").ok_or_else(|| "do_action requires id".to_string())?;
+            let action = str_arg(&args, "action");
+            let index = args.get("index").and_then(|v| v.as_i64()).map(|i| i as i32);
+            ok_json(
+                &do_action(&s, &id, action.as_deref(), index)
+                    .await
+                    .map_err(err_str)?,
+            )
+        }
+        "type_into" => {
+            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let id = str_arg(&args, "id").ok_or_else(|| "type_into requires id".to_string())?;
+            let text = str_arg(&args, "text").ok_or_else(|| "type_into requires text".to_string())?;
+            let append = args
+                .get("append")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            ok_json(&type_into(&s, &id, &text, append).await.map_err(err_str)?)
+        }
+        "set_value" => {
+            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let id = str_arg(&args, "id").ok_or_else(|| "set_value requires id".to_string())?;
+            let value = args
+                .get("value")
+                .and_then(|v| v.as_f64())
+                .ok_or_else(|| "set_value requires value".to_string())?;
+            ok_json(&set_value(&s, &id, value).await.map_err(err_str)?)
+        }
+        "screenshot" => {
+            let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
+            let session = AtspiSession::connect().await.ok();
+            let target = if full {
+                None
+            } else if args.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
+                // only treat as target if a selector is present
+                let has = str_arg(&args, "id").is_some()
+                    || str_arg(&args, "name").is_some()
+                    || args.get("pid").is_some()
+                    || args.get("frontmost").and_then(|v| v.as_bool()).unwrap_or(false);
+                if has {
+                    Some(target_from_args(&args)?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            ok_json(
+                &screenshot(session.as_ref(), target.as_ref())
+                    .await
+                    .map_err(err_str)?,
+            )
+        }
+        "mouse_move" => {
+            let x = args
+                .get("x")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| "mouse_move requires x".to_string())? as i32;
+            let y = args
+                .get("y")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| "mouse_move requires y".to_string())? as i32;
+            ok_json(&json!({ "ok": true, "detail": mouse_move(x, y).await.map_err(err_str)? }))
+        }
+        "mouse_click" => {
+            let x = args
+                .get("x")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| "mouse_click requires x".to_string())? as i32;
+            let y = args
+                .get("y")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| "mouse_click requires y".to_string())? as i32;
+            let button = args.get("button").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+            ok_json(&json!({
+                "ok": true,
+                "detail": mouse_click(x, y, button).await.map_err(err_str)?
+            }))
+        }
+        "type_text" => {
+            let text =
+                str_arg(&args, "text").ok_or_else(|| "type_text requires text".to_string())?;
+            ok_json(&json!({ "ok": true, "detail": type_text(&text).await.map_err(err_str)? }))
+        }
+        "key" => {
+            let keyspec =
+                str_arg(&args, "key").ok_or_else(|| "key requires key".to_string())?;
+            ok_json(&json!({ "ok": true, "detail": key(&keyspec).await.map_err(err_str)? }))
+        }
         other => Err(format!(
-            "unknown tool '{other}' — see tools/list (S1 surface: doctor, list_*, frontmost, activate, snapshot, find_elements, focused_element)"
+            "unknown tool '{other}' — see tools/list (S2: eyes + hands + screenshot + input fallbacks)"
         )),
     }
 }
