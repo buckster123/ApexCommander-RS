@@ -9,9 +9,12 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   CLI + MCP faces, `docs/{CHARTER,design,PRD}.md`, CI, MIT licence, env-only `doctor`,
   unit tests for types/report JSON. Evidence: `cargo test --workspace` green;
   `apex-harness doctor` / MCP `tools/list` + `doctor` call.
-- [ ] **S1 — eyes (AT-SPI)**: connect bus; `list_windows` / `list_apps` / `frontmost` /
-  `activate`; compact `snapshot` + `find_elements` + `focused_element`. Pure tree compactors
-  unit-tested; one live GTK/Qt window snapshot as field evidence.
+- [x] **S1 — eyes (AT-SPI)** (2026-08-10): connect bus; `list_apps` / `list_windows` /
+  `frontmost` / `activate` (GrabFocus); compact `snapshot` + `find_elements` +
+  `focused_element`. Pure find/id unit tests (12 total). Field evidence on ubuntu:GNOME
+  Wayland: doctor reports `atspi` bus live · 11 apps; geany snapshot shows frame/menu/tool
+  bar; `find --name geany --role button` returns Minimize/Restore/Close/New with bounds +
+  actions. Note: GrabFocus often false on Wayland (gotcha); compositor raise deferred to S2.
 - [ ] **S2 — hands + capture**: AT-SPI `do_action` / `set_value` / `type_into`; input backend
   (portal/libei or ydotool/uinput fallback); window-scoped `screenshot`; mutation audit JSONL;
   sensitive-app denylist stub.

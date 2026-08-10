@@ -60,14 +60,15 @@ capabilities; the public tool surface stays stable across compositors.
 
 | Tool | Purpose | Mutation | Status |
 |---|---|---|---|
-| `doctor` | Structured readiness (session, AT-SPI, input, capture, window backend, recommendations) | read-only | **S0 live** |
-| `list_apps` / `list_windows` | Running apps + top-level windows (name, pid, class, bounds, focused, a11y root) | read-only | planned S1 |
-| `frontmost` | Focused window + application | read-only | planned S1 |
-| `activate` | Focus / raise window or app by name, id, or pid | mutating | planned S1 |
+| `doctor` | Structured readiness (session, AT-SPI, input, capture, window backend, recommendations) | read-only | **live** |
+| `list_apps` | AT-SPI application roots (name, pid, toolkit, window_count, id) | read-only | **S1 live** |
+| `list_windows` | Top-level frames/dialogs (title, app, pid, focused, bounds, id) | read-only | **S1 live** |
+| `frontmost` | Best-effort focused window (shell chrome deprioritized) | read-only | **S1 live** |
+| `activate` | Focus / raise via AT-SPI `GrabFocus` (by id / name / pid / frontmost) | mutating | **S1 live** |
 | `launch` | Open app by desktop entry or executable (safety-checked) | mutating | planned S2 |
-| `snapshot` | Compact a11y tree of a window/app (depth + node budget, filterable) | read-only | planned S1 |
-| `find_elements` | Semantic selectors (role + name/text/state/description) | read-only | planned S1 |
-| `focused_element` | Details of the currently focused a11y node | read-only | planned S1 |
+| `snapshot` | Compact a11y tree (max_depth + max_nodes; bounds + actions) | read-only | **S1 live** |
+| `find_elements` | Semantic selectors (role + name/text/state) under a target | read-only | **S1 live** |
+| `focused_element` | Details of the currently focused a11y node under a target | read-only | **S1 live** |
 | `do_action` / `click_element` / `set_value` / `type_into` | Prefer AT-SPI actions and value interfaces | mutating | planned S2 |
 | `mouse_*` / `key_*` / `type_text` / `scroll` / `drag` | Real input injection fallback | mutating | planned S2 |
 | `screenshot` | Window / region / display capture → path or base64 | read-only* | planned S2 |
@@ -124,9 +125,17 @@ Core shared types live in `apex_harness::types` and are **serde load-bearing**:
 | `MutationClass` | `read_only` \| `mutating` \| `destructive` |
 | `SessionKind` | `x11` \| `wayland` \| `unknown` |
 | `Capability` | `{ name, available, detail? }` |
-| `WindowInfo` | Discovery row |
+| `AppInfo` | Application root row |
+| `WindowInfo` | Discovery row (`id`, title, app, pid, focused, bounds, role) |
 | `Bounds` | `{ x, y, width, height }` physical pixels, origin top-left |
-| `A11yNode` | Compact tree node (role, name, description, value, states, actions, bounds, children) |
+| `A11yNode` | Compact tree node (`id?`, role, name, description, value, states, actions, bounds, children) |
+| `SnapshotOpts` | `max_depth` (default 6), `max_nodes` (default 200), bounds/actions flags |
+| `FindQuery` | role / name / text / state filters + `max_results` |
+| `ElementHit` | Find result with breadcrumb `path` |
+| `TargetRef` | `id` \| `name` \| `pid` \| `frontmost` |
+| `ActivateResult` | `{ ok, id, title?, detail }` |
+
+**Ids:** `{bus_unique_name}|{object_path}` (e.g. `:1.11|/org/a11y/atspi/accessible/943`).
 
 Serialization: `snake_case` enums; omit empty optionals / empty vectors where annotated.
 

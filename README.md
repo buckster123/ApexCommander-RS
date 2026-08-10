@@ -12,7 +12,7 @@ without defaulting to vision loops.</p>
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 <img alt="rust" src="https://img.shields.io/badge/rust-2021-orange?logo=rust&logoColor=white">
 <img alt="ci" src="https://img.shields.io/github/actions/workflow/status/buckster123/ApexDesktopHarness-RS/ci.yml?label=ci">
-<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20bootstrap-brightgreen">
+<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20eyes-brightgreen">
 </p>
 
 </div>
@@ -44,19 +44,18 @@ Binaries: `target/release/apex-harness` (CLI) and `target/release/apex-harness-m
 ## Use
 
 ```sh
-# Readiness report (start here)
+# Readiness (start here)
 cargo run -p apex-harness-cli -- doctor
-cargo run -p apex-harness-cli -- --json doctor
 
-# MCP smoke
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | cargo run -q -p apex-harness-mcp
+# Eyes — discover + compact a11y tree
+cargo run -p apex-harness-cli -- list-windows
+cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
+cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
+
+# MCP (stdio) — tools/list includes doctor, list_*, snapshot, find_elements, …
 ```
 
-S0 ships `doctor` only. Eyes (AT-SPI snapshot) and hands (actions + input) land in S1–S2 — see
+S1 ships AT-SPI eyes. Hands (element actions + real input + screenshots) land in S2 — see
 [`BACKLOG.md`](BACKLOG.md).
 
 ## How it works

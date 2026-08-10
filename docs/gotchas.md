@@ -12,5 +12,24 @@
 > explicit don't. Cross-project version drift lives in
 > `~/Projects/Launchpad-RS/docs/sharp-edges.md` instead.
 
-<!-- Empty at bootstrap. It fills up. That's the point — every entry here is a bug
-     that will now never happen twice. -->
+- **Element ids are `{bus}|{path}` on the a11y bus, not X11/Wayland surface ids.** Bus unique
+  names like `:1.11` restart with the app. Don't cache ids across process lifetimes; re-list
+  after relaunch.
+
+- **Recursive `async fn` is illegal without boxing.** Tree walks must be iterative (arena /
+  stack) or `Box::pin`. Don't reintroduce recursive `walk_node`/`focused_dfs` "for clarity".
+
+- **GNOME Shell "Main stage" often owns AT-SPI focus.** `frontmost` deprioritizes shell chrome
+  (`gnome-shell`, `gjs` Desktop Icons). Don't treat "Main stage" as a useful agent target without
+  an explicit id.
+
+- **`Component.GrabFocus` frequently returns false on Wayland.** Raising/focusing real windows
+  may need a compositor backend (hyprctl / gdbus Shell / KWin) in S2+. Don't claim activate
+  succeeded when GrabFocus is false — surface the boolean honestly.
+
+- **Headless CI has no AT-SPI bus.** Unit tests cover pure find/id/types only. Live probes are
+  field tests; `doctor` must degrade with a real reason, never panic. Don't add integration
+  tests that fail the default `cargo test` without a display.
+
+- **MCP stdout is sacred.** All tracing → stderr. A stray `println!` in the MCP face corrupts
+  JSON-RPC.

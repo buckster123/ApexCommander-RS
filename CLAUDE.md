@@ -125,16 +125,18 @@ cargo test --workspace
 cargo fmt --all && cargo clippy --workspace -- -D warnings
 cargo build --release --workspace
 
-# Human face
+# Human face — eyes (S1)
 cargo run -p apex-harness-cli -- doctor
-cargo run -p apex-harness-cli -- --json doctor
+cargo run -p apex-harness-cli -- list-windows
+cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
+cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
 
 # MCP smoke (stdout is JSON-RPC only)
 printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"doctor","arguments":{}}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_windows","arguments":{}}}' \
   | cargo run -q -p apex-harness-mcp
 ```
 

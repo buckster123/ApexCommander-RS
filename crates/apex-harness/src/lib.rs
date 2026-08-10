@@ -9,6 +9,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod a11y;
 pub mod doctor;
 pub mod error;
 pub mod types;

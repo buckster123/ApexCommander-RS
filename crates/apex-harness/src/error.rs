@@ -30,5 +30,18 @@ pub enum HarnessError {
     Other(String),
 }
 
+impl HarnessError {
+    /// Suggested process exit code for the CLI face.
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::NotFound(_) => 3,
+            Self::Ambiguous(_) => 4,
+            Self::Unavailable(_) => 2,
+            Self::PolicyBlocked(_) => 5,
+            _ => 1,
+        }
+    }
+}
+
 /// Convenience alias.
 pub type Result<T> = std::result::Result<T, HarnessError>;
