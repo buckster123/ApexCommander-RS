@@ -20,9 +20,11 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   crop via a11y bounds; audit JSONL (`~/.local/share/apex-harness/audit.jsonl`); sensitive
   denylist stub (`policy`). Field: portal shot ok; `do_action Click` on Geany “New” → true
   + audit line; doctor reports capture=ok input=no (no ydotool). 19 unit tests.
-- [ ] **S3 — agent fit**: remaining MCP tools + wait helpers; `selftest`; skill doc
-  (efficiency rules); ApexOS-RS `plugins.toml` integration notes; end-to-end acceptance from
-  PRD §10 without screenshots in the happy path.
+- [x] **S3 — agent fit** (2026-08-10): `wait` / `wait_for_element` / `wait_for_stable`;
+  `launch`; `selftest` (mutate opt-in); skill `skills/apex-desktop-harness/SKILL.md`;
+  `docs/apexos-integration.md` (plugins.toml template). Field: selftest ok on GNOME;
+  launch org.gnome.Calculator; wait_for_element finds button. PRD §10 happy path covered
+  without screenshots (discover → snapshot/find → do_action).
 - [ ] **S4 — field**: verify on GNOME, KDE/Plasma, and Hyprland sessions; record
   compositor-specific gotchas in `docs/gotchas.md`.
 

@@ -16,7 +16,10 @@ use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
 use apex_harness::error::HarnessError;
 use apex_harness::input::{key, mouse_click, mouse_move, type_text};
+use apex_harness::launch::launch_app;
+use apex_harness::selftest::{run_selftest, SelftestOpts};
 use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
+use apex_harness::wait::{wait_for_element, wait_for_stable, wait_ms};
 use apex_harness::{NAME, VERSION};
 
 #[derive(Parser)]
@@ -163,6 +166,65 @@ enum Command {
     TypeText { text: String },
     /// Key combo (backend-specific, e.g. Return or ctrl+c).
     Key { keyspec: String },
+    /// Launch an app by desktop id (org.gnome.Calculator) or executable.
+    Launch {
+        /// Desktop file id or executable path/name.
+        target: String,
+    },
+    /// Sleep for N milliseconds.
+    Wait {
+        #[arg(long, default_value_t = 1000)]
+        ms: u64,
+    },
+    /// Poll until an element matches under a target window.
+    WaitForElement {
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        pid: Option<u32>,
+        #[arg(long)]
+        frontmost: bool,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        element_name: Option<String>,
+        #[arg(long)]
+        text: Option<String>,
+        #[arg(long)]
+        state: Option<String>,
+        #[arg(long, default_value_t = 10000)]
+        timeout_ms: u64,
+        #[arg(long, default_value_t = 200)]
+        poll_ms: u64,
+    },
+    /// Poll until the a11y tree fingerprint stays stable.
+    WaitForStable {
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        pid: Option<u32>,
+        #[arg(long)]
+        frontmost: bool,
+        #[arg(long, default_value_t = 10000)]
+        timeout_ms: u64,
+        #[arg(long, default_value_t = 200)]
+        poll_ms: u64,
+        #[arg(long, default_value_t = 400)]
+        stable_for_ms: u64,
+    },
+    /// Structured smoke suite (doctor + discovery + snapshot). Use --confirm for mouse wiggle.
+    Selftest {
+        /// Allow mutating steps (visible mouse wiggle when input backend exists).
+        #[arg(long)]
+        confirm: bool,
+        /// Preferred window/app name for snapshot step.
+        #[arg(long)]
+        target: Option<String>,
+    },
     /// Print version.
     Version,
 }
@@ -390,6 +452,81 @@ async fn run() -> Result<()> {
                 println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
             } else {
                 println!("{detail}");
+            }
+        }
+        Command::Launch { target } => {
+            let result = launch_app(&target).await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(1);
+            }
+        }
+        Command::Wait { ms } => {
+            emit(&wait_ms(Some(ms)).await, cli.json)?;
+        }
+        Command::WaitForElement {
+            id,
+            name,
+            pid,
+            frontmost: fm,
+            role,
+            element_name,
+            text,
+            state,
+            timeout_ms,
+            poll_ms,
+        } => {
+            let session = AtspiSession::connect().await?;
+            let target = target_from_flags(id, name, pid, fm)?;
+            let query = FindQuery {
+                role,
+                name: element_name,
+                name_exact: false,
+                text,
+                state,
+                description: None,
+                max_results: 5,
+            };
+            let result =
+                wait_for_element(&session, &target, query, Some(timeout_ms), Some(poll_ms)).await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(3);
+            }
+        }
+        Command::WaitForStable {
+            id,
+            name,
+            pid,
+            frontmost: fm,
+            timeout_ms,
+            poll_ms,
+            stable_for_ms,
+        } => {
+            let session = AtspiSession::connect().await?;
+            let target = target_from_flags(id, name, pid, fm)?;
+            let result = wait_for_stable(
+                &session,
+                &target,
+                Some(timeout_ms),
+                Some(poll_ms),
+                Some(stable_for_ms),
+            )
+            .await?;
+            emit(&result, cli.json)?;
+            if !result.ok {
+                std::process::exit(3);
+            }
+        }
+        Command::Selftest { confirm, target } => {
+            let report = run_selftest(SelftestOpts {
+                confirm_mutate: confirm,
+                target_name: target,
+            })
+            .await?;
+            emit(&report, cli.json)?;
+            if !report.ok {
+                std::process::exit(2);
             }
         }
         Command::Version => {

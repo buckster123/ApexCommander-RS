@@ -65,7 +65,7 @@ capabilities; the public tool surface stays stable across compositors.
 | `list_windows` | Top-level frames/dialogs (title, app, pid, focused, bounds, id) | read-only | **S1 live** |
 | `frontmost` | Best-effort focused window (shell chrome deprioritized) | read-only | **S1 live** |
 | `activate` | Focus / raise via AT-SPI `GrabFocus` (by id / name / pid / frontmost) | mutating | **S1 live** |
-| `launch` | Open app by desktop entry or executable (safety-checked) | mutating | planned S2 |
+| `launch` | Open app by desktop id or executable (safety-checked) | mutating | **S3 live** |
 | `snapshot` | Compact a11y tree (max_depth + max_nodes; bounds + actions) | read-only | **S1 live** |
 | `find_elements` | Semantic selectors (role + name/text/state) under a target | read-only | **S1 live** |
 | `focused_element` | Details of the currently focused a11y node under a target | read-only | **S1 live** |
@@ -74,8 +74,10 @@ capabilities; the public tool surface stays stable across compositors.
 | `set_value` | Value interface (slider/spin) | mutating | **S2 live** |
 | `mouse_move` / `mouse_click` / `type_text` / `key` | Real input via ydotool/xdotool/wtype when installed | mutating | **S2 live** (probe) |
 | `screenshot` | Display or window-crop → path under state dir | read-only* | **S2 live** |
-| `wait` / `wait_for_element` | Stability / presence helpers | read-only | planned S3 |
-| `selftest` | Non-destructive smoke (wiggle + type needs confirm) | mutating | planned S3 |
+| `wait` | Sleep `timeout_ms` (clamped) | read-only | **S3 live** |
+| `wait_for_element` | Poll find until match or timeout | read-only | **S3 live** |
+| `wait_for_stable` | Poll until tree fingerprint stable | read-only | **S3 live** |
+| `selftest` | Doctor + discovery + snapshot smoke; mutate only if confirmed | mixed | **S3 live** |
 
 \*Screenshot is read-only w.r.t. the desktop but may write a file under the state dir.
 
@@ -229,6 +231,9 @@ Preferred registration: MCP plugin stdio entry in `plugins.toml` pointing at the
 binary `apex-harness-mcp`. High-risk tools route through existing PolicyEngine / approval UI.
 Screenshots and audit events may be ingested into Cerebro by the host — the harness does not
 embed Cerebro.
+
+**Full template + install path:** [`apexos-integration.md`](apexos-integration.md).  
+**Agent efficiency rules:** [`../skills/apex-desktop-harness/SKILL.md`](../skills/apex-desktop-harness/SKILL.md).
 
 Standalone is first-class: any MCP host or shell script can use the same surface with zero
 ApexOS dependency.

@@ -15,9 +15,12 @@ pub mod capture;
 pub mod doctor;
 pub mod error;
 pub mod input;
+pub mod launch;
 pub mod paths;
 pub mod policy;
+pub mod selftest;
 pub mod types;
+pub mod wait;
 
 /// Crate / product name used in logs, MCP `serverInfo`, and CLI `--version`.
 pub const NAME: &str = "apex-harness";

@@ -12,7 +12,7 @@ without defaulting to vision loops.</p>
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 <img alt="rust" src="https://img.shields.io/badge/rust-2021-orange?logo=rust&logoColor=white">
 <img alt="ci" src="https://img.shields.io/github/actions/workflow/status/buckster123/ApexDesktopHarness-RS/ci.yml?label=ci">
-<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20hands-brightgreen">
+<img alt="status" src="https://img.shields.io/badge/status-v0.1%20%C2%B7%20agent--fit-brightgreen">
 </p>
 
 </div>
@@ -55,10 +55,15 @@ cargo run -p apex-harness-cli -- --json find --name geany --role button --max-re
 # Hands + capture
 cargo run -p apex-harness-cli -- --json do-action --id ':1.11|/…' --action Click
 cargo run -p apex-harness-cli -- --json screenshot --name geany
+
+# Agent fit
+cargo run -p apex-harness-cli -- selftest
+cargo run -p apex-harness-cli -- launch org.gnome.Calculator
 ```
 
-S2 ships AT-SPI hands + portal screenshots + audit log. Wait helpers / selftest / ApexOS
-plugin registration land in S3 — see [`BACKLOG.md`](BACKLOG.md).
+S3 ships wait helpers, launch, selftest, agent skill, and ApexOS integration notes.
+See [`BACKLOG.md`](BACKLOG.md) · [`skills/apex-desktop-harness/SKILL.md`](skills/apex-desktop-harness/SKILL.md) ·
+[`docs/apexos-integration.md`](docs/apexos-integration.md).
 
 ## How it works
 
@@ -80,6 +85,8 @@ window-scoped capture before full display · audit every mutation · `doctor` fi
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements — goals, architecture, acceptance |
 | [`docs/design.md`](docs/design.md) | The contract — tools, types, invariants |
 | [`docs/CHARTER.md`](docs/CHARTER.md) | Binding decisions D1–D12 |
+| [`docs/apexos-integration.md`](docs/apexos-integration.md) | ApexOS plugins.toml + install |
+| [`skills/apex-desktop-harness/SKILL.md`](skills/apex-desktop-harness/SKILL.md) | Agent skill / efficiency rules |
 | [`BACKLOG.md`](BACKLOG.md) | Slice ledger — what's shipped, what's next |
 
 ## License

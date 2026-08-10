@@ -16,7 +16,10 @@ use apex_harness::a11y::{
 use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
 use apex_harness::input::{key, mouse_click, mouse_move, type_text};
+use apex_harness::launch::launch_app;
+use apex_harness::selftest::{run_selftest, SelftestOpts};
 use apex_harness::types::{FindQuery, SnapshotOpts, TargetRef};
+use apex_harness::wait::{wait_for_element, wait_for_stable, wait_ms};
 use apex_harness::{NAME, VERSION};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
@@ -324,6 +327,84 @@ fn tool_schemas() -> Vec<Value> {
             false,
             false,
         ),
+        tool(
+            "launch",
+            "Launch an application by desktop id (org.gnome.Calculator) or executable. Mutating. Sensitive names blocked.",
+            json!({
+                "type":"object",
+                "properties":{"target":{"type":"string","description":"desktop id or executable"}},
+                "required":["target"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "wait",
+            "Sleep for timeout_ms (clamped 1..120000, default 10000). Read-only. Use between steps when needed.",
+            json!({
+                "type":"object",
+                "properties":{"timeout_ms":{"type":"integer","minimum":1}},
+                "additionalProperties":false
+            }),
+            true,
+            false,
+        ),
+        tool(
+            "wait_for_element",
+            "Poll find_elements until a match or timeout. Read-only. Prefer over fixed sleeps when waiting for UI.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string"},
+                    "name":{"type":"string"},
+                    "pid":{"type":"integer"},
+                    "frontmost":{"type":"boolean"},
+                    "role":{"type":"string"},
+                    "element_name":{"type":"string"},
+                    "text":{"type":"string"},
+                    "state":{"type":"string"},
+                    "timeout_ms":{"type":"integer"},
+                    "poll_ms":{"type":"integer"}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+        ),
+        tool(
+            "wait_for_stable",
+            "Poll until the a11y tree fingerprint stays unchanged for stable_for_ms. Read-only.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string"},
+                    "name":{"type":"string"},
+                    "pid":{"type":"integer"},
+                    "frontmost":{"type":"boolean"},
+                    "timeout_ms":{"type":"integer"},
+                    "poll_ms":{"type":"integer"},
+                    "stable_for_ms":{"type":"integer"}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+        ),
+        tool(
+            "selftest",
+            "Structured smoke suite: doctor, list apps/windows, snapshot, find. Mutating mouse wiggle only if confirm_mutate=true.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "confirm_mutate":{"type":"boolean"},
+                    "target_name":{"type":"string"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
     ]
 }
 
@@ -528,8 +609,67 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 str_arg(&args, "key").ok_or_else(|| "key requires key".to_string())?;
             ok_json(&json!({ "ok": true, "detail": key(&keyspec).await.map_err(err_str)? }))
         }
+        "launch" => {
+            let target =
+                str_arg(&args, "target").ok_or_else(|| "launch requires target".to_string())?;
+            ok_json(&launch_app(&target).await.map_err(err_str)?)
+        }
+        "wait" => {
+            let ms = args.get("timeout_ms").and_then(|v| v.as_u64());
+            ok_json(&wait_ms(ms).await)
+        }
+        "wait_for_element" => {
+            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let target = target_from_args(&args)?;
+            let query = FindQuery {
+                role: str_arg(&args, "role"),
+                name: str_arg(&args, "element_name"),
+                name_exact: false,
+                text: str_arg(&args, "text"),
+                state: str_arg(&args, "state"),
+                description: None,
+                max_results: 5,
+            };
+            let timeout = args.get("timeout_ms").and_then(|v| v.as_u64());
+            let poll = args.get("poll_ms").and_then(|v| v.as_u64());
+            ok_json(
+                &wait_for_element(&s, &target, query, timeout, poll)
+                    .await
+                    .map_err(err_str)?,
+            )
+        }
+        "wait_for_stable" => {
+            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let target = target_from_args(&args)?;
+            ok_json(
+                &wait_for_stable(
+                    &s,
+                    &target,
+                    args.get("timeout_ms").and_then(|v| v.as_u64()),
+                    args.get("poll_ms").and_then(|v| v.as_u64()),
+                    args.get("stable_for_ms").and_then(|v| v.as_u64()),
+                )
+                .await
+                .map_err(err_str)?,
+            )
+        }
+        "selftest" => {
+            let confirm = args
+                .get("confirm_mutate")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let target_name = str_arg(&args, "target_name");
+            ok_json(
+                &run_selftest(SelftestOpts {
+                    confirm_mutate: confirm,
+                    target_name,
+                })
+                .await
+                .map_err(err_str)?,
+            )
+        }
         other => Err(format!(
-            "unknown tool '{other}' — see tools/list (S2: eyes + hands + screenshot + input fallbacks)"
+            "unknown tool '{other}' — see tools/list (S3 catalog: eyes, hands, wait, launch, selftest)"
         )),
     }
 }

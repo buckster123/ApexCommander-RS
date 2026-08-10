@@ -131,6 +131,8 @@ cargo run -p apex-harness-cli -- list-windows
 cargo run -p apex-harness-cli -- snapshot --name geany --max-depth 4
 cargo run -p apex-harness-cli -- --json find --name geany --role button --max-results 10
 cargo run -p apex-harness-cli -- --json screenshot --full
+cargo run -p apex-harness-cli -- selftest
+cargo run -p apex-harness-cli -- launch org.gnome.Calculator
 # do-action / type-into need a live element id from find
 
 # MCP smoke (stdout is JSON-RPC only)
@@ -174,6 +176,8 @@ Project-specific (will grow in S1+):
 | `docs/CHARTER.md` | **Binding decisions D1–D12, phases, scope fence** |
 | `docs/design.md` | **The contract** — tools, types, invariants |
 | `docs/PRD.md` | Product intent, acceptance criteria, roadmap narrative |
+| `docs/apexos-integration.md` | plugins.toml + install path for ApexOS-RS |
+| `skills/apex-desktop-harness/SKILL.md` | Agent efficiency rules + tool cheatsheet |
 | `docs/gotchas.md` | **Any subsystem change — grep it first** |
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
 
