@@ -15,6 +15,7 @@ use apex_harness::a11y::{
 use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
 use apex_harness::error::HarnessError;
+use apex_harness::field::{markdown_summary, run_field_report};
 use apex_harness::input::{key, mouse_click, mouse_move, type_text};
 use apex_harness::launch::launch_app;
 use apex_harness::selftest::{run_selftest, SelftestOpts};
@@ -224,6 +225,15 @@ enum Command {
         /// Preferred window/app name for snapshot step.
         #[arg(long)]
         target: Option<String>,
+    },
+    /// Compositor field matrix (GNOME / Plasma / Hyprland). Emits JSON; --markdown for docs paste.
+    FieldReport {
+        /// Also print a markdown section to stderr for docs/field-matrix.md.
+        #[arg(long)]
+        markdown: bool,
+        /// Reserved for future mutating field checks.
+        #[arg(long)]
+        confirm: bool,
     },
     /// Print version.
     Version,
@@ -525,6 +535,17 @@ async fn run() -> Result<()> {
             })
             .await?;
             emit(&report, cli.json)?;
+            if !report.ok {
+                std::process::exit(2);
+            }
+        }
+        Command::FieldReport { markdown, confirm } => {
+            let report = run_field_report(confirm).await?;
+            if markdown {
+                eprintln!("{}", markdown_summary(&report));
+            }
+            // Always machine-readable on stdout for the matrix ledger.
+            println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.ok {
                 std::process::exit(2);
             }

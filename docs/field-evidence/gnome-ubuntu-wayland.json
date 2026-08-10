@@ -1,0 +1,106 @@
+{
+  "ok": true,
+  "identity": {
+    "session_type": "wayland",
+    "desktop": "ubuntu:GNOME",
+    "desktop_session": "ubuntu",
+    "wayland_display": "wayland-0",
+    "display": ":0",
+    "family": "gnome",
+    "helpers": {
+      "gio": true,
+      "gnome-screenshot": true,
+      "grim": false,
+      "gtk-launch": true,
+      "hyprctl": false,
+      "i3-msg": false,
+      "kdotool": false,
+      "qdbus": false,
+      "qdbus6": false,
+      "slurp": false,
+      "swaymsg": false,
+      "wtype": false,
+      "xdotool": false,
+      "ydotool": false
+    },
+    "session_files": [
+      "ubuntu.desktop"
+    ]
+  },
+  "checks": [
+    {
+      "name": "doctor",
+      "ok": true,
+      "skipped": false,
+      "detail": "session=Wayland desktop=ubuntu:GNOME — AT-SPI hands+eyes ready; capture=ok input=no"
+    },
+    {
+      "name": "capture_probe",
+      "ok": true,
+      "skipped": false,
+      "detail": "backends: xdg-desktop-portal, gnome-shell-screenshot, gnome-screenshot-cli"
+    },
+    {
+      "name": "input_probe",
+      "ok": false,
+      "skipped": true,
+      "detail": "no ydotool/xdotool/wtype in PATH — element AT-SPI actions still work; install ydotool for coordinate fallback"
+    },
+    {
+      "name": "atspi_connect",
+      "ok": true,
+      "skipped": false,
+      "detail": "connected"
+    },
+    {
+      "name": "list_apps",
+      "ok": true,
+      "skipped": false,
+      "detail": "13 apps; toolkits={\"clutter\": 1, \"gtk\": 12}"
+    },
+    {
+      "name": "list_windows",
+      "ok": true,
+      "skipped": false,
+      "detail": "20 windows; focused_flag=2"
+    },
+    {
+      "name": "activate_grab_focus",
+      "ok": true,
+      "skipped": false,
+      "detail": "GrabFocus returned false on Some(\"untitled - Geany\") — GrabFocus returned false — window may not accept focus"
+    },
+    {
+      "name": "snapshot",
+      "ok": true,
+      "skipped": false,
+      "detail": "role=frame nodes=60 truncated=true max_depth_hit=true"
+    },
+    {
+      "name": "find_button",
+      "ok": true,
+      "skipped": false,
+      "detail": "3 button(s); first=Some(\"Minimize\")"
+    },
+    {
+      "name": "screenshot",
+      "ok": true,
+      "skipped": false,
+      "detail": "backend=xdg-desktop-portal scope=window bytes=1464552 path=/home/andre/.local/share/apex-harness/screenshots/shot-20260810T190147.857.png"
+    },
+    {
+      "name": "compositor_helpers",
+      "ok": true,
+      "skipped": false,
+      "detail": "{\"gio\": true, \"gnome-screenshot\": true, \"grim\": false, \"gtk-launch\": true, \"hyprctl\": false, \"i3-msg\": false, \"kdotool\": false, \"qdbus\": false, \"qdbus6\": false, \"slurp\": false, \"swaymsg\": false, \"wtype\": false, \"xdotool\": false, \"ydotool\": false}"
+    }
+  ],
+  "toolkits": {
+    "clutter": 1,
+    "gtk": 12
+  },
+  "app_count": 13,
+  "window_count": 20,
+  "summary": "field ok on gnome (ubuntu:GNOME) — apps=13 windows=20 toolkits={\"clutter\": 1, \"gtk\": 12}",
+  "captured_at": "2026-08-10T21:01:47.205323946+02:00"
+}

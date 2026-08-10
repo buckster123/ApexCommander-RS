@@ -15,6 +15,7 @@ use apex_harness::a11y::{
 };
 use apex_harness::capture::screenshot;
 use apex_harness::doctor::run_doctor;
+use apex_harness::field::run_field_report;
 use apex_harness::input::{key, mouse_click, mouse_move, type_text};
 use apex_harness::launch::launch_app;
 use apex_harness::selftest::{run_selftest, SelftestOpts};
@@ -405,6 +406,19 @@ fn tool_schemas() -> Vec<Value> {
             false,
             false,
         ),
+        tool(
+            "field_report",
+            "Compositor field matrix for the current session (identity, AT-SPI, capture, activate honesty, screenshot). Re-run under GNOME/Plasma/Hyprland. Read-only aside from optional screenshot file write.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "confirm_mutate":{"type":"boolean"}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+        ),
     ]
 }
 
@@ -471,10 +485,7 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             let s = AtspiSession::connect().await.map_err(err_str)?;
             let target = target_from_args(&args)?;
             let opts = SnapshotOpts {
-                max_depth: args
-                    .get("max_depth")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(6) as u32,
+                max_depth: args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(6) as u32,
                 max_nodes: args
                     .get("max_nodes")
                     .and_then(|v| v.as_u64())
@@ -516,7 +527,11 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             } else {
                 Some(target_from_args(&args)?)
             };
-            ok_json(&focused_element(&s, target.as_ref()).await.map_err(err_str)?)
+            ok_json(
+                &focused_element(&s, target.as_ref())
+                    .await
+                    .map_err(err_str)?,
+            )
         }
         "do_action" => {
             let s = AtspiSession::connect().await.map_err(err_str)?;
@@ -532,7 +547,8 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
         "type_into" => {
             let s = AtspiSession::connect().await.map_err(err_str)?;
             let id = str_arg(&args, "id").ok_or_else(|| "type_into requires id".to_string())?;
-            let text = str_arg(&args, "text").ok_or_else(|| "type_into requires text".to_string())?;
+            let text =
+                str_arg(&args, "text").ok_or_else(|| "type_into requires text".to_string())?;
             let append = args
                 .get("append")
                 .and_then(|v| v.as_bool())
@@ -558,7 +574,10 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 let has = str_arg(&args, "id").is_some()
                     || str_arg(&args, "name").is_some()
                     || args.get("pid").is_some()
-                    || args.get("frontmost").and_then(|v| v.as_bool()).unwrap_or(false);
+                    || args
+                        .get("frontmost")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
                 if has {
                     Some(target_from_args(&args)?)
                 } else {
@@ -605,8 +624,7 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             ok_json(&json!({ "ok": true, "detail": type_text(&text).await.map_err(err_str)? }))
         }
         "key" => {
-            let keyspec =
-                str_arg(&args, "key").ok_or_else(|| "key requires key".to_string())?;
+            let keyspec = str_arg(&args, "key").ok_or_else(|| "key requires key".to_string())?;
             ok_json(&json!({ "ok": true, "detail": key(&keyspec).await.map_err(err_str)? }))
         }
         "launch" => {
@@ -668,8 +686,15 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 .map_err(err_str)?,
             )
         }
+        "field_report" => {
+            let confirm = args
+                .get("confirm_mutate")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            ok_json(&run_field_report(confirm).await.map_err(err_str)?)
+        }
         other => Err(format!(
-            "unknown tool '{other}' — see tools/list (S3 catalog: eyes, hands, wait, launch, selftest)"
+            "unknown tool '{other}' — see tools/list (S4 catalog includes field_report)"
         )),
     }
 }

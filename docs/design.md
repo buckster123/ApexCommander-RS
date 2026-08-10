@@ -78,6 +78,7 @@ capabilities; the public tool surface stays stable across compositors.
 | `wait_for_element` | Poll find until match or timeout | read-only | **S3 live** |
 | `wait_for_stable` | Poll until tree fingerprint stable | read-only | **S3 live** |
 | `selftest` | Doctor + discovery + snapshot smoke; mutate only if confirmed | mixed | **S3 live** |
+| `field_report` | Compositor matrix for current session (identity + AT-SPI + capture) | read-only* | **S4 live** |
 
 \*Screenshot is read-only w.r.t. the desktop but may write a file under the state dir.
 

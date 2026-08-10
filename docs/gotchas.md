@@ -47,3 +47,39 @@
 
 - **Sensitive denylist is substring + local only.** It does not replace ApexOS PolicyEngine
   approval. Patterns live in defaults + optional `~/.config/apex-harness/sensitive.toml`.
+
+## Compositor / DE matrix (S4)
+
+Full ledger: [`field-matrix.md`](field-matrix.md). Re-run `scripts/run-field-matrix.sh` inside
+each live session; never mark Plasma/Hyprland from a GNOME session.
+
+### GNOME (Wayland) — verified
+
+- **Portal screenshots work; Shell.Screenshot often AccessDenied.** Prefer portal path; don't
+  treat AccessDenied as total capture failure if portal is available.
+- **GrabFocus may return D-Bus `NotSupported`** (e.g. Ptyxis frames), not only `false`. Map both
+  to honest activate detail — don't panic or claim focus moved.
+- **focused_flag counts include shell chrome.** Always filter Main stage / gjs Desktop Icons for
+  agent targets.
+- **Session file on Ubuntu is often only `ubuntu.desktop`.** Family classification uses
+  `XDG_CURRENT_DESKTOP=ubuntu:GNOME` → `gnome`.
+
+### Plasma (KDE) — pending live run
+
+- Expect **xdg-desktop-portal-kde** for capture; optional Spectacle CLI later.
+- Qt toolkit strings in AT-SPI may differ (`qt`, `Qt`, …) — histogram is informational.
+- Window raise may need **KWin** scripting/`qdbus` when GrabFocus is weak (post-v1 backend).
+- Don't assume GNOME Shell.Screenshot exists.
+
+### Hyprland — pending live run
+
+- Prefer **grim** (+ slurp for regions) when portal is unset; probe helpers map includes `hyprctl`.
+- Enable toolkit a11y (GTK a11y modules) or AT-SPI trees stay empty for many apps.
+- Window focus/raise almost always needs **`hyprctl dispatch`** — AT-SPI GrabFocus alone is not
+  enough; don't claim activate success without a compositor backend.
+
+### Cross-DE
+
+- **field-report PASS ≠ GrabFocus true.** PASS means checks completed with honest degrades.
+- **Only one Wayland session file on this host** (`ubuntu.desktop`) — Plasma/Hyprland need install
+  + login before their matrix rows can flip green.

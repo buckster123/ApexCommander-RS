@@ -14,6 +14,7 @@ pub mod audit;
 pub mod capture;
 pub mod doctor;
 pub mod error;
+pub mod field;
 pub mod input;
 pub mod launch;
 pub mod paths;

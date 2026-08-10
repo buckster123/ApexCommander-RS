@@ -25,8 +25,12 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   `docs/apexos-integration.md` (plugins.toml template). Field: selftest ok on GNOME;
   launch org.gnome.Calculator; wait_for_element finds button. PRD §10 happy path covered
   without screenshots (discover → snapshot/find → do_action).
-- [ ] **S4 — field**: verify on GNOME, KDE/Plasma, and Hyprland sessions; record
-  compositor-specific gotchas in `docs/gotchas.md`.
+- [x] **S4 — field** (2026-08-10): `field-report` / MCP `field_report` +
+  `scripts/run-field-matrix.sh` + `docs/field-matrix.md` ledger.
+  **GNOME Wayland PASS** (ubuntu:GNOME, 13 apps / 20 windows, portal screenshot, honest
+  GrabFocus NotSupported). Plasma + Hyprland **PENDING** (sessions not installed on host —
+  re-run script after login). Compositor gotchas in `docs/gotchas.md`. Evidence under
+  `docs/field-evidence/`.
 
 ## Post-v1 parking
 

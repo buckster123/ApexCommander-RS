@@ -1,0 +1,18 @@
+### gnome — ubuntu:GNOME (wayland)
+- **Captured:** 2026-08-10T21:01:47.205323946+02:00
+- **Result:** PASS
+- **Apps / windows:** 13 / 20
+- **Toolkits:** `{"clutter": 1, "gtk": 12}`
+- **Checks:**
+  - `doctor` **ok** — session=Wayland desktop=ubuntu:GNOME — AT-SPI hands+eyes ready; capture=ok input=no
+  - `capture_probe` **ok** — backends: xdg-desktop-portal, gnome-shell-screenshot, gnome-screenshot-cli
+  - `input_probe` **skip** — no ydotool/xdotool/wtype in PATH — element AT-SPI actions still work; install ydotool for coordinate fallback
+  - `atspi_connect` **ok** — connected
+  - `list_apps` **ok** — 13 apps; toolkits={"clutter": 1, "gtk": 12}
+  - `list_windows` **ok** — 20 windows; focused_flag=2
+  - `activate_grab_focus` **ok** — GrabFocus returned false on Some("untitled - Geany") — GrabFocus returned false — window may not accept focus
+  - `snapshot` **ok** — role=frame nodes=60 truncated=true max_depth_hit=true
+  - `find_button` **ok** — 3 button(s); first=Some("Minimize")
+  - `screenshot` **ok** — backend=xdg-desktop-portal scope=window bytes=1464552 path=/home/andre/.local/share/apex-harness/screenshots/shot-20260810T190147.857.png
+  - `compositor_helpers` **ok** — {"gio": true, "gnome-screenshot": true, "grim": false, "gtk-launch": true, "hyprctl": false, "i3-msg": false, "kdotool": false, "qdbus": false, "qdbus6": false, "slurp": false, "swaymsg": false, "wtype": false, "xdotool": false, "ydotool": false}
+- **Summary:** field ok on gnome (ubuntu:GNOME) — apps=13 windows=20 toolkits={"clutter": 1, "gtk": 12}
