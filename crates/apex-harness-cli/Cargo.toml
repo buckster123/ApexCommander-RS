@@ -1,0 +1,19 @@
+[package]
+name = "apex-harness-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Apex Desktop Harness CLI — human/ops face"
+
+[[bin]]
+name = "apex-harness"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+apex-harness = { path = "../apex-harness" }
+clap.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
