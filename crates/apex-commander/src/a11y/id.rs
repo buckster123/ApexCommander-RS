@@ -11,6 +11,11 @@ pub fn decode_id(id: &str) -> Option<(&str, &str)> {
         .filter(|(b, p)| !b.is_empty() && p.starts_with('/'))
 }
 
+/// True when `id` is on accessibility bus `bus` (`{bus}|{path}`).
+pub fn id_on_bus(id: &str, bus: &str) -> bool {
+    decode_id(id).is_some_and(|(b, _)| b == bus)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -29,5 +34,13 @@ mod tests {
         assert!(decode_id("nope").is_none());
         assert!(decode_id("|/path").is_none());
         assert!(decode_id("bus|notapath").is_none());
+    }
+
+    #[test]
+    fn bus_match() {
+        let id = encode_id(":1.9", "/org/a11y/atspi/accessible/1");
+        assert!(id_on_bus(&id, ":1.9"));
+        assert!(!id_on_bus(&id, ":1.10"));
+        assert!(!id_on_bus("not-an-id", ":1.9"));
     }
 }

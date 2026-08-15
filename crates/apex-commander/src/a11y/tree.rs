@@ -5,13 +5,14 @@ use atspi::proxy::proxy_ext::ProxyExt;
 use atspi::State;
 
 use crate::a11y::find::find_in_tree;
-use crate::a11y::id::encode_id;
+use crate::a11y::id::{decode_id, encode_id, id_on_bus};
 use crate::a11y::session::AtspiSession;
 use crate::a11y::walk::{
     bounds_of, has_state, id_of, is_active_or_focused, is_toplevel_role, nonempty, role_of,
     states_of, walk_compact, SnapshotStats,
 };
 use crate::error::{HarnessError, Result};
+use crate::policy::{self, SensitiveConfig};
 use crate::types::{
     A11yNode, ActivateResult, AppInfo, ElementHit, FindQuery, SnapshotOpts, TargetRef, WindowInfo,
 };
@@ -160,7 +161,11 @@ fn is_shell_chrome(w: &WindowInfo) -> bool {
 
 /// Focus / raise a window via AT-SPI `Component.GrabFocus`.
 pub async fn activate(session: &AtspiSession, target: &TargetRef) -> Result<ActivateResult> {
+    crate::audit::require_writable()?;
     let window = resolve_window(session, target).await?;
+    let cfg = SensitiveConfig::load();
+    policy::enforce_window(&window, "activate", &cfg)?;
+
     let proxy = session.proxy_for_id(&window.id).await?;
     let proxies = proxy
         .proxies()
@@ -170,25 +175,56 @@ pub async fn activate(session: &AtspiSession, target: &TargetRef) -> Result<Acti
         HarnessError::Unavailable(format!("no Component interface on {}: {e}", window.id))
     })?;
 
-    let ok = component
-        .grab_focus()
-        .await
-        .map_err(|e| HarnessError::Other(format!("GrabFocus failed on {}: {e}", window.id)))?;
+    let title = if window.title.is_empty() {
+        None
+    } else {
+        Some(window.title.clone())
+    };
+    let result = match component.grab_focus().await {
+        Ok(ok) => ActivateResult {
+            ok,
+            id: window.id.clone(),
+            title,
+            detail: if ok {
+                "GrabFocus returned true".into()
+            } else {
+                "GrabFocus returned false — window may not accept focus".into()
+            },
+        },
+        Err(e) => {
+            let msg = e.to_string();
+            if grab_focus_not_supported(&msg) {
+                ActivateResult {
+                    ok: false,
+                    id: window.id.clone(),
+                    title,
+                    detail: format!("GrabFocus not supported: {msg}"),
+                }
+            } else {
+                return Err(HarnessError::Other(format!(
+                    "GrabFocus failed on {}: {msg}",
+                    window.id
+                )));
+            }
+        }
+    };
 
-    Ok(ActivateResult {
-        ok,
-        id: window.id,
-        title: if window.title.is_empty() {
-            None
-        } else {
-            Some(window.title)
-        },
-        detail: if ok {
-            "GrabFocus returned true".into()
-        } else {
-            "GrabFocus returned false — window may not accept focus".into()
-        },
-    })
+    let _ = crate::audit::record_after(
+        "activate",
+        crate::types::MutationClass::Mutating,
+        Some(serde_json::json!({"id": result.id, "title": result.title})),
+        result.ok,
+        &result.detail,
+    );
+    Ok(result)
+}
+
+/// D-Bus `NotSupported` (and close cousins) must not become a hard error.
+pub fn grab_focus_not_supported(msg: &str) -> bool {
+    let m = msg.to_lowercase();
+    m.contains("notsupported")
+        || m.contains("not supported")
+        || m.contains("org.freedesktop.dbus.error.notsupported")
 }
 
 /// Compact a11y snapshot of a target window/app.
@@ -198,27 +234,37 @@ pub async fn snapshot(
     opts: SnapshotOpts,
 ) -> Result<(A11yNode, SnapshotStats)> {
     let id = resolve_proxy_id(session, target).await?;
-    let proxy = session.proxy_for_id(&id).await?;
-    Ok(walk_compact(session, &proxy, &opts).await)
+    let cfg = SensitiveConfig::load();
+    let classified = classify_id(session, &id).await?;
+    policy::enforce_classified(&classified, "snapshot", &cfg)?;
+    walk_from_id(session, &id, &opts).await
 }
 
 /// Find elements under a target (live walk → pure match).
+///
+/// Uses the caller's `opts` as given — faces that want a deeper search must
+/// pass that budget explicitly (no silent raise).
 pub async fn find_elements(
     session: &AtspiSession,
     target: &TargetRef,
     query: FindQuery,
     opts: SnapshotOpts,
 ) -> Result<Vec<ElementHit>> {
-    // Walk with a generous budget for search; still capped.
-    let mut opts = opts;
-    if opts.max_nodes < 400 {
-        opts.max_nodes = 400;
-    }
-    if opts.max_depth < 10 {
-        opts.max_depth = 10;
-    }
-    let (tree, _stats) = snapshot(session, target, opts).await?;
+    let id = resolve_proxy_id(session, target).await?;
+    let cfg = SensitiveConfig::load();
+    let classified = classify_id(session, &id).await?;
+    policy::enforce_classified(&classified, "find_elements", &cfg)?;
+    let (tree, _stats) = walk_from_id(session, &id, &opts).await?;
     Ok(find_in_tree(&tree, &query))
+}
+
+async fn walk_from_id(
+    session: &AtspiSession,
+    id: &str,
+    opts: &SnapshotOpts,
+) -> Result<(A11yNode, SnapshotStats)> {
+    let proxy = session.proxy_for_id(id).await?;
+    Ok(walk_compact(session, &proxy, opts).await)
 }
 
 /// Details of the currently focused accessible, if any, under a target (or desktop-wide).
@@ -251,7 +297,44 @@ pub async fn focused_element(
 
 // ── resolvers ──────────────────────────────────────────────────────────
 
-async fn resolve_window(session: &AtspiSession, target: &TargetRef) -> Result<WindowInfo> {
+/// Windows (or app-root stand-ins) on the same a11y bus as `id`.
+pub async fn classify_id(session: &AtspiSession, id: &str) -> Result<Vec<WindowInfo>> {
+    let (bus, _) = decode_id(id).ok_or_else(|| {
+        HarnessError::Other(format!(
+            "invalid element id '{id}' — expected '{{bus}}|{{object_path}}'"
+        ))
+    })?;
+    windows_on_bus(session, bus).await
+}
+
+/// Top-level windows whose id shares `bus`. Falls back to the application root.
+pub async fn windows_on_bus(session: &AtspiSession, bus: &str) -> Result<Vec<WindowInfo>> {
+    let windows = list_windows(session).await?;
+    let hits: Vec<_> = windows
+        .into_iter()
+        .filter(|w| id_on_bus(&w.id, bus))
+        .collect();
+    if !hits.is_empty() {
+        return Ok(hits);
+    }
+    let apps = list_apps(session).await?;
+    Ok(apps
+        .into_iter()
+        .filter(|a| id_on_bus(&a.id, bus))
+        .map(|a| WindowInfo {
+            id: a.id,
+            title: String::new(),
+            app_name: Some(a.name),
+            pid: a.pid,
+            focused: false,
+            bounds: None,
+            a11y_root: true,
+            role: Some("application".into()),
+        })
+        .collect())
+}
+
+pub async fn resolve_window(session: &AtspiSession, target: &TargetRef) -> Result<WindowInfo> {
     match target {
         TargetRef::Frontmost => frontmost(session).await,
         TargetRef::Id(id) => {
@@ -414,4 +497,22 @@ async fn window_has_focused_descendant(session: &AtspiSession, window_id: &str) 
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::grab_focus_not_supported;
+
+    #[test]
+    fn not_supported_is_honest_not_hard_error() {
+        assert!(grab_focus_not_supported(
+            "org.freedesktop.DBus.Error.NotSupported: GrabFocus"
+        ));
+        assert!(grab_focus_not_supported(
+            "GrabFocus not supported on this frame"
+        ));
+        assert!(!grab_focus_not_supported(
+            "org.freedesktop.DBus.Error.NoReply"
+        ));
+    }
 }

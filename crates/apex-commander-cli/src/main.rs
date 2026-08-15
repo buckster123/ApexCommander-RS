@@ -265,7 +265,21 @@ async fn run() -> Result<()> {
     match cli.command {
         Command::Doctor => {
             let report = run_doctor().await;
-            emit(&report, cli.json)?;
+            if cli.json {
+                emit(&report, true)?;
+            } else {
+                println!("{}", report.summary);
+                for c in &report.capabilities {
+                    let mark = if c.available { "ok" } else { "no" };
+                    match &c.detail {
+                        Some(d) => println!("  {mark}  {} — {d}", c.name),
+                        None => println!("  {mark}  {}", c.name),
+                    }
+                }
+                for r in &report.recommendations {
+                    println!("- {r}");
+                }
+            }
             if !report.ok {
                 std::process::exit(2);
             }
@@ -367,8 +381,14 @@ async fn run() -> Result<()> {
                 description: None,
                 max_results,
             };
+            let opts = SnapshotOpts {
+                max_depth: 10,
+                max_nodes: 400,
+                include_bounds: true,
+                include_actions: true,
+            };
             emit(
-                &find_elements(&session, &target, query, SnapshotOpts::default()).await?,
+                &find_elements(&session, &target, query, opts).await?,
                 cli.json,
             )?;
         }
@@ -433,7 +453,8 @@ async fn run() -> Result<()> {
             emit(&result, cli.json)?;
         }
         Command::MouseMove { x, y } => {
-            let detail = mouse_move(x, y).await?;
+            let session = AtspiSession::connect().await.ok();
+            let detail = mouse_move(session.as_ref(), x, y).await?;
             if cli.json {
                 println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
             } else {
@@ -441,7 +462,8 @@ async fn run() -> Result<()> {
             }
         }
         Command::MouseClick { x, y, button } => {
-            let detail = mouse_click(x, y, button).await?;
+            let session = AtspiSession::connect().await.ok();
+            let detail = mouse_click(session.as_ref(), x, y, button).await?;
             if cli.json {
                 println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
             } else {
@@ -449,7 +471,8 @@ async fn run() -> Result<()> {
             }
         }
         Command::TypeText { text } => {
-            let detail = type_text(&text).await?;
+            let session = AtspiSession::connect().await.ok();
+            let detail = type_text(session.as_ref(), &text).await?;
             if cli.json {
                 println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
             } else {
@@ -457,7 +480,8 @@ async fn run() -> Result<()> {
             }
         }
         Command::Key { keyspec } => {
-            let detail = key(&keyspec).await?;
+            let session = AtspiSession::connect().await.ok();
+            let detail = key(session.as_ref(), &keyspec).await?;
             if cli.json {
                 println!("{}", serde_json::json!({ "ok": true, "detail": detail }));
             } else {
@@ -589,7 +613,9 @@ fn target_from_flags(
     bail!("need a target: --id, --name, --pid, or --frontmost");
 }
 
-fn emit<T: serde::Serialize>(value: &T, _json: bool) -> Result<()> {
+fn emit<T: serde::Serialize>(value: &T, json: bool) -> Result<()> {
+    // Structured types are JSON either way; `--json` is the explicit machine flag.
+    let _ = json;
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
 }

@@ -35,8 +35,9 @@ pub async fn launch_app(spec: &str) -> Result<LaunchResult> {
         return Err(HarnessError::Other("launch target is empty".into()));
     }
 
+    crate::audit::require_writable()?;
     let cfg = SensitiveConfig::load();
-    policy::guard_name(spec, &cfg)?;
+    policy::enforce_name(spec, "launch", &cfg)?;
 
     if looks_dangerous(spec) {
         return Err(HarnessError::PolicyBlocked(format!(
@@ -57,7 +58,9 @@ pub async fn launch_app(spec: &str) -> Result<LaunchResult> {
                 return run_detached("gio", &["launch", p.to_str().unwrap_or(id)], spec, "gio")
                     .await;
             }
-            return run_detached("gtk-launch", &[id], spec, "gtk-launch-fallback").await;
+            return Err(HarnessError::NotFound(format!(
+                "desktop entry {id}.desktop not found in XDG applications dirs"
+            )));
         }
         return Err(HarnessError::Unavailable(
             "neither gtk-launch nor gio available to launch desktop entry".into(),
@@ -141,13 +144,12 @@ async fn run_detached(
     // Detach: forget the child handle so we don't wait / kill on drop.
     std::mem::forget(child);
 
-    let detail = format!("spawned via {backend}");
-    audit::record(
+    let detail = audit::record_after(
         "launch",
         MutationClass::Mutating,
         Some(json!({"target": target, "backend": backend, "pid": pid})),
         true,
-        &detail,
+        &format!("spawned via {backend} (not waited)"),
     );
 
     Ok(LaunchResult {

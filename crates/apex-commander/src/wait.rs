@@ -107,6 +107,9 @@ pub async fn wait_for_element(
                 debug!(polls, "wait_for_element: no match yet");
             }
             Err(e) => {
+                if matches!(e, crate::error::HarnessError::PolicyBlocked(_)) {
+                    return Err(e);
+                }
                 // Target window may not exist yet — keep polling until timeout.
                 debug!(error = %e, polls, "wait_for_element: transient error");
             }
@@ -155,6 +158,9 @@ pub async fn wait_for_stable(
         let fp = match snapshot(session, target, opts).await {
             Ok((tree, stats)) => fingerprint_tree(&tree, stats.nodes_emitted),
             Err(e) => {
+                if matches!(e, crate::error::HarnessError::PolicyBlocked(_)) {
+                    return Err(e);
+                }
                 debug!(error = %e, "wait_for_stable: snapshot error");
                 last_fp = None;
                 stable_since = None;

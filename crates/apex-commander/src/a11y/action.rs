@@ -5,6 +5,7 @@ use serde_json::json;
 use tracing::debug;
 
 use crate::a11y::session::AtspiSession;
+use crate::a11y::tree::classify_id;
 use crate::a11y::walk::bounds_of;
 use crate::audit;
 use crate::error::{HarnessError, Result};
@@ -21,8 +22,10 @@ pub async fn do_action(
     action: Option<&str>,
     index: Option<i32>,
 ) -> Result<ActionResult> {
+    audit::require_writable()?;
     let cfg = SensitiveConfig::load();
-    policy::guard_name(element_id, &cfg)?;
+    let classified = classify_id(session, element_id).await?;
+    policy::enforce_classified(&classified, "do_action", &cfg)?;
 
     let proxy = session.proxy_for_id(element_id).await?;
     let proxies = proxy
@@ -41,13 +44,13 @@ pub async fn do_action(
         .map_err(|e| HarnessError::Other(format!("GetActions: {e}")))?;
 
     if actions.is_empty() {
-        let r = ActionResult {
+        let mut r = ActionResult {
             ok: false,
             id: element_id.into(),
             action: None,
             detail: "element exposes Action interface but has zero actions".into(),
         };
-        audit::record(
+        r.detail = audit::record_after(
             "do_action",
             MutationClass::Mutating,
             Some(json!({"id": element_id})),
@@ -100,7 +103,7 @@ pub async fn do_action(
     };
     debug!(%element_id, %chosen, ok, "do_action");
 
-    audit::record(
+    let detail = audit::record_after(
         "do_action",
         MutationClass::Mutating,
         Some(json!({"id": element_id, "action": chosen, "index": idx})),
@@ -122,8 +125,10 @@ pub async fn set_value(
     element_id: &str,
     value: f64,
 ) -> Result<ActionResult> {
+    audit::require_writable()?;
     let cfg = SensitiveConfig::load();
-    policy::guard_name(element_id, &cfg)?;
+    let classified = classify_id(session, element_id).await?;
+    policy::enforce_classified(&classified, "set_value", &cfg)?;
 
     let proxy = session.proxy_for_id(element_id).await?;
     let proxies = proxy
@@ -139,13 +144,12 @@ pub async fn set_value(
         .await
         .map_err(|e| HarnessError::Other(format!("SetCurrentValue: {e}")))?;
 
-    let detail = format!("set current value to {value}");
-    audit::record(
+    let detail = audit::record_after(
         "set_value",
         MutationClass::Mutating,
         Some(json!({"id": element_id, "value": value})),
         true,
-        &detail,
+        &format!("set current value to {value}"),
     );
 
     Ok(ActionResult {
@@ -166,8 +170,10 @@ pub async fn type_into(
     text: &str,
     append: bool,
 ) -> Result<ActionResult> {
+    audit::require_writable()?;
     let cfg = SensitiveConfig::load();
-    policy::guard_name(element_id, &cfg)?;
+    let classified = classify_id(session, element_id).await?;
+    policy::enforce_classified(&classified, "type_into", &cfg)?;
 
     let proxy = session.proxy_for_id(element_id).await?;
     // Best-effort focus first.
@@ -232,7 +238,7 @@ pub async fn type_into(
         "EditableText returned false".into()
     };
 
-    audit::record(
+    let detail = audit::record_after(
         "type_into",
         MutationClass::Mutating,
         Some(json!({
@@ -256,9 +262,12 @@ pub async fn type_into(
     })
 }
 
-/// Click the first matching action, resolving by element id (convenience).
+/// Click via AT-SPI. Prefers a `click` action; falls back to Press/Activate/first.
 pub async fn click_element(session: &AtspiSession, element_id: &str) -> Result<ActionResult> {
-    do_action(session, element_id, Some("click"), None).await
+    match do_action(session, element_id, Some("click"), None).await {
+        Err(HarnessError::NotFound(_)) => do_action(session, element_id, None, None).await,
+        other => other,
+    }
 }
 
 /// Return element id + bounds for coordinate fallbacks (no mutation).

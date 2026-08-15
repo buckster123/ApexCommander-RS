@@ -7,11 +7,12 @@ use std::io::{BufRead, Write};
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use apex_commander::a11y::{
-    activate, do_action, find_elements, focused_element, frontmost, list_apps, list_windows,
-    set_value, snapshot, type_into, AtspiSession,
+    activate, click_element, do_action, find_elements, focused_element, frontmost, list_apps,
+    list_windows, set_value, snapshot, type_into, AtspiSession,
 };
 use apex_commander::capture::screenshot;
 use apex_commander::doctor::run_doctor;
@@ -25,6 +26,33 @@ use apex_commander::{NAME, VERSION};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
+
+/// Process-local AT-SPI handle. Not a daemon — this MCP process is already warm.
+struct McpState {
+    atspi: Mutex<Option<AtspiSession>>,
+}
+
+impl McpState {
+    fn new() -> Self {
+        Self {
+            atspi: Mutex::new(None),
+        }
+    }
+
+    async fn lock_session(
+        &self,
+    ) -> std::result::Result<tokio::sync::MutexGuard<'_, Option<AtspiSession>>, String> {
+        let mut g = self.atspi.lock().await;
+        if g.is_none() {
+            *g = Some(AtspiSession::connect().await.map_err(err_str)?);
+        }
+        Ok(g)
+    }
+
+    async fn invalidate(&self) {
+        *self.atspi.lock().await = None;
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,6 +70,7 @@ async fn main() -> Result<()> {
         "apex-commander-mcp starting"
     );
 
+    let state = McpState::new();
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
     let mut reader = stdin.lock();
@@ -79,7 +108,7 @@ async fn main() -> Result<()> {
             }
         };
 
-        if let Some(resp) = dispatch(&req).await {
+        if let Some(resp) = dispatch(&state, &req).await {
             write_frame(&mut stdout, &resp)?;
         }
     }
@@ -94,7 +123,7 @@ fn write_frame(out: &mut impl Write, value: &Value) -> Result<()> {
     Ok(())
 }
 
-async fn dispatch(req: &Value) -> Option<Value> {
+async fn dispatch(state: &McpState, req: &Value) -> Option<Value> {
     let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
     let id = req.get("id").cloned();
 
@@ -110,7 +139,7 @@ async fn dispatch(req: &Value) -> Option<Value> {
         })),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": tool_schemas() })),
-        "tools/call" => tools_call(req).await,
+        "tools/call" => tools_call(state, req).await,
         other => Err(format!("method not found: {other}")),
     };
 
@@ -218,7 +247,7 @@ fn tool_schemas() -> Vec<Value> {
         ),
         tool(
             "do_action",
-            "AT-SPI DoAction on an element by id. Prefer over coordinate clicks. Optional action name (Click/Press/…) or index.",
+            "AT-SPI DoAction on an element by id. Prefer over coordinate clicks. Optional action name (Click/Press/…) or index. Sensitive apps blocked.",
             json!({
                 "type":"object",
                 "properties":{
@@ -233,8 +262,22 @@ fn tool_schemas() -> Vec<Value> {
             false,
         ),
         tool(
+            "click_element",
+            "AT-SPI click on an element id (Click, else Press/Activate/first). Prefer over mouse_click. Sensitive apps blocked.",
+            json!({
+                "type":"object",
+                "properties":{
+                    "id":{"type":"string","description":"{bus}|{path}"}
+                },
+                "required":["id"],
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
             "type_into",
-            "Set or append text via EditableText on an element id. Prefer over type_text key injection.",
+            "Set or append text via EditableText on an element id. Prefer over type_text key injection. May type secrets — host should require approval.",
             json!({
                 "type":"object",
                 "properties":{
@@ -246,7 +289,7 @@ fn tool_schemas() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
-            false,
+            true,
         ),
         tool(
             "set_value",
@@ -310,7 +353,7 @@ fn tool_schemas() -> Vec<Value> {
         ),
         tool(
             "type_text",
-            "Type via real key events (fallback). Prefer type_into on EditableText.",
+            "Type via real key events (fallback). Prefer type_into on EditableText. May type secrets — host should require approval.",
             json!({
                 "type":"object",
                 "properties":{"text":{"type":"string"}},
@@ -318,11 +361,11 @@ fn tool_schemas() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
-            false,
+            true,
         ),
         tool(
             "key",
-            "Send a key/combo via input backend (syntax backend-specific).",
+            "Send a key/combo via input backend (syntax backend-specific). May submit forms — host should require approval.",
             json!({
                 "type":"object",
                 "properties":{"key":{"type":"string"}},
@@ -330,7 +373,7 @@ fn tool_schemas() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
-            false,
+            true,
         ),
         tool(
             "launch",
@@ -342,7 +385,7 @@ fn tool_schemas() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
-            false,
+            true,
         ),
         tool(
             "wait",
@@ -412,7 +455,7 @@ fn tool_schemas() -> Vec<Value> {
         ),
         tool(
             "field_report",
-            "Compositor field matrix for the current session (identity, AT-SPI, capture, activate honesty, screenshot). Re-run under GNOME/Plasma/Hyprland. Read-only aside from optional screenshot file write.",
+            "Compositor field matrix (identity, AT-SPI, capture, GrabFocus honesty, screenshot file write). Not read-only — may focus a window and write a PNG. Re-run under GNOME/Plasma/Hyprland.",
             json!({
                 "type":"object",
                 "properties":{
@@ -420,7 +463,7 @@ fn tool_schemas() -> Vec<Value> {
                 },
                 "additionalProperties":false
             }),
-            true,
+            false,
             false,
         ),
     ]
@@ -458,7 +501,7 @@ fn target_schema() -> Value {
     })
 }
 
-async fn tools_call(req: &Value) -> Result<Value, String> {
+async fn tools_call(state: &McpState, req: &Value) -> Result<Value, String> {
     let params = req.get("params").cloned().unwrap_or(json!({}));
     let name = params
         .get("name")
@@ -466,27 +509,32 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
         .ok_or_else(|| "tools/call missing params.name".to_string())?;
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
-    match name {
+    let result = match name {
         "doctor" => ok_json(&run_doctor().await),
         "list_apps" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
-            ok_json(&list_apps(&s).await.map_err(err_str)?)
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
+            ok_json(&list_apps(s).await.map_err(err_str)?)
         }
         "list_windows" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
-            ok_json(&list_windows(&s).await.map_err(err_str)?)
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
+            ok_json(&list_windows(s).await.map_err(err_str)?)
         }
         "frontmost" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
-            ok_json(&frontmost(&s).await.map_err(err_str)?)
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
+            ok_json(&frontmost(s).await.map_err(err_str)?)
         }
         "activate" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let target = target_from_args(&args)?;
-            ok_json(&activate(&s, &target).await.map_err(err_str)?)
+            ok_json(&activate(s, &target).await.map_err(err_str)?)
         }
         "snapshot" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let target = target_from_args(&args)?;
             let opts = SnapshotOpts {
                 max_depth: args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(6) as u32,
@@ -497,11 +545,12 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 include_bounds: true,
                 include_actions: true,
             };
-            let (tree, stats) = snapshot(&s, &target, opts).await.map_err(err_str)?;
+            let (tree, stats) = snapshot(s, &target, opts).await.map_err(err_str)?;
             ok_json(&json!({ "tree": tree, "stats": stats }))
         }
         "find_elements" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let target = target_from_args(&args)?;
             let query = FindQuery {
                 role: str_arg(&args, "role"),
@@ -518,38 +567,49 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(25) as u32,
             };
+            let opts = SnapshotOpts {
+                max_depth: 10,
+                max_nodes: 400,
+                include_bounds: true,
+                include_actions: true,
+            };
             ok_json(
-                &find_elements(&s, &target, query, SnapshotOpts::default())
+                &find_elements(s, &target, query, opts)
                     .await
                     .map_err(err_str)?,
             )
         }
         "focused_element" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let target = if args.as_object().map(|o| o.is_empty()).unwrap_or(true) {
                 None
             } else {
                 Some(target_from_args(&args)?)
             };
-            ok_json(
-                &focused_element(&s, target.as_ref())
-                    .await
-                    .map_err(err_str)?,
-            )
+            ok_json(&focused_element(s, target.as_ref()).await.map_err(err_str)?)
         }
         "do_action" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let id = str_arg(&args, "id").ok_or_else(|| "do_action requires id".to_string())?;
             let action = str_arg(&args, "action");
             let index = args.get("index").and_then(|v| v.as_i64()).map(|i| i as i32);
             ok_json(
-                &do_action(&s, &id, action.as_deref(), index)
+                &do_action(s, &id, action.as_deref(), index)
                     .await
                     .map_err(err_str)?,
             )
         }
+        "click_element" => {
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
+            let id = str_arg(&args, "id").ok_or_else(|| "click_element requires id".to_string())?;
+            ok_json(&click_element(s, &id).await.map_err(err_str)?)
+        }
         "type_into" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let id = str_arg(&args, "id").ok_or_else(|| "type_into requires id".to_string())?;
             let text =
                 str_arg(&args, "text").ok_or_else(|| "type_into requires text".to_string())?;
@@ -557,24 +617,25 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 .get("append")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            ok_json(&type_into(&s, &id, &text, append).await.map_err(err_str)?)
+            ok_json(&type_into(s, &id, &text, append).await.map_err(err_str)?)
         }
         "set_value" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let id = str_arg(&args, "id").ok_or_else(|| "set_value requires id".to_string())?;
             let value = args
                 .get("value")
                 .and_then(|v| v.as_f64())
                 .ok_or_else(|| "set_value requires value".to_string())?;
-            ok_json(&set_value(&s, &id, value).await.map_err(err_str)?)
+            ok_json(&set_value(s, &id, value).await.map_err(err_str)?)
         }
         "screenshot" => {
             let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
-            let session = AtspiSession::connect().await.ok();
+            let g = state.lock_session().await.ok();
+            let session = g.as_ref().and_then(|g| g.as_ref());
             let target = if full {
                 None
             } else if args.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
-                // only treat as target if a selector is present
                 let has = str_arg(&args, "id").is_some()
                     || str_arg(&args, "name").is_some()
                     || args.get("pid").is_some()
@@ -591,7 +652,7 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 None
             };
             ok_json(
-                &screenshot(session.as_ref(), target.as_ref())
+                &screenshot(session, target.as_ref())
                     .await
                     .map_err(err_str)?,
             )
@@ -605,7 +666,11 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 .get("y")
                 .and_then(|v| v.as_i64())
                 .ok_or_else(|| "mouse_move requires y".to_string())? as i32;
-            ok_json(&json!({ "ok": true, "detail": mouse_move(x, y).await.map_err(err_str)? }))
+            let g = state.lock_session().await?;
+            ok_json(&json!({
+                "ok": true,
+                "detail": mouse_move(g.as_ref(), x, y).await.map_err(err_str)?
+            }))
         }
         "mouse_click" => {
             let x = args
@@ -617,19 +682,28 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
                 .and_then(|v| v.as_i64())
                 .ok_or_else(|| "mouse_click requires y".to_string())? as i32;
             let button = args.get("button").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+            let g = state.lock_session().await?;
             ok_json(&json!({
                 "ok": true,
-                "detail": mouse_click(x, y, button).await.map_err(err_str)?
+                "detail": mouse_click(g.as_ref(), x, y, button).await.map_err(err_str)?
             }))
         }
         "type_text" => {
             let text =
                 str_arg(&args, "text").ok_or_else(|| "type_text requires text".to_string())?;
-            ok_json(&json!({ "ok": true, "detail": type_text(&text).await.map_err(err_str)? }))
+            let g = state.lock_session().await?;
+            ok_json(&json!({
+                "ok": true,
+                "detail": type_text(g.as_ref(), &text).await.map_err(err_str)?
+            }))
         }
         "key" => {
             let keyspec = str_arg(&args, "key").ok_or_else(|| "key requires key".to_string())?;
-            ok_json(&json!({ "ok": true, "detail": key(&keyspec).await.map_err(err_str)? }))
+            let g = state.lock_session().await?;
+            ok_json(&json!({
+                "ok": true,
+                "detail": key(g.as_ref(), &keyspec).await.map_err(err_str)?
+            }))
         }
         "launch" => {
             let target =
@@ -641,7 +715,8 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             ok_json(&wait_ms(ms).await)
         }
         "wait_for_element" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             let target = target_from_args(&args)?;
             let query = FindQuery {
                 role: str_arg(&args, "role"),
@@ -654,19 +729,18 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             };
             let timeout = args.get("timeout_ms").and_then(|v| v.as_u64());
             let poll = args.get("poll_ms").and_then(|v| v.as_u64());
-            ok_json(
-                &wait_for_element(&s, &target, query, timeout, poll)
-                    .await
-                    .map_err(err_str)?,
-            )
+            let opts_ok = wait_for_element(s, &target, query, timeout, poll)
+                .await
+                .map_err(err_str)?;
+            ok_json(&opts_ok)
         }
         "wait_for_stable" => {
-            let s = AtspiSession::connect().await.map_err(err_str)?;
-            let target = target_from_args(&args)?;
+            let g = state.lock_session().await?;
+            let s = g.as_ref().unwrap();
             ok_json(
                 &wait_for_stable(
-                    &s,
-                    &target,
+                    s,
+                    &target_from_args(&args)?,
                     args.get("timeout_ms").and_then(|v| v.as_u64()),
                     args.get("poll_ms").and_then(|v| v.as_u64()),
                     args.get("stable_for_ms").and_then(|v| v.as_u64()),
@@ -698,9 +772,17 @@ async fn tools_call(req: &Value) -> Result<Value, String> {
             ok_json(&run_field_report(confirm).await.map_err(err_str)?)
         }
         other => Err(format!(
-            "unknown tool '{other}' — see tools/list (S4 catalog includes field_report)"
+            "unknown tool '{other}' — see tools/list (S5 catalog includes click_element)"
         )),
+    };
+
+    if let Err(msg) = &result {
+        let l = msg.to_lowercase();
+        if l.contains("at-spi") || l.contains("unavailable") || l.contains("disconnected") {
+            state.invalidate().await;
+        }
     }
+    result
 }
 
 fn target_from_args(args: &Value) -> Result<TargetRef, String> {

@@ -50,8 +50,9 @@ Notes:
 
 Mutating MCP tools advertise:
 
-- `readOnlyHint: false` for `do_action`, `type_into`, `set_value`, `activate`, `launch`,
-  `mouse_*`, `type_text`, `key`, `selftest` (when mutate confirmed)
+- `readOnlyHint: false` for `do_action`, `click_element`, `type_into`, `set_value`, `activate`,
+  `launch`, `mouse_*`, `type_text`, `key`, `selftest`, `field_report`
+- `destructiveHint: true` for `type_into`, `type_text`, `key`, `launch` (secrets / submit / spawn)
 - `readOnlyHint: true` for `doctor`, `list_*`, `snapshot`, `find_*`, `wait*`, `screenshot`
 
 Route high-risk tools through the existing approval UI. The harness **also** applies a

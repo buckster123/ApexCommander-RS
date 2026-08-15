@@ -6,13 +6,16 @@
 //! - `xdotool` (X11)
 //! - `wtype` (Wayland text only)
 //!
-//! Portal/libei is not wired in S2 — probed as future work.
+//! Coordinate tools fail closed when the frontmost window cannot be classified
+//! against the sensitive-app denylist. Portal/libei is not wired — probed later.
 
 use serde_json::json;
 use tracing::debug;
 
+use crate::a11y::{frontmost, AtspiSession};
 use crate::audit;
 use crate::error::{HarnessError, Result};
+use crate::policy::{self, SensitiveConfig};
 use crate::types::{Capability, InputBackendKind, MutationClass};
 
 /// Probe which input backends are installed (not whether they can open uinput).
@@ -27,7 +30,6 @@ pub fn probe_input() -> Capability {
     if which("wtype") {
         available.push("wtype");
     }
-    // AT-SPI element actions always available when atspi is; reported separately.
     if available.is_empty() {
         Capability {
             name: "input".into(),
@@ -43,7 +45,7 @@ pub fn probe_input() -> Capability {
             name: "input".into(),
             available: true,
             detail: Some(format!(
-                "coordinate/type fallback: {} (prefer AT-SPI do_action/type_into)",
+                "coordinate/type fallback: {} (prefer AT-SPI do_action/type_into; PATH probe only)",
                 available.join(", ")
             )),
         }
@@ -84,8 +86,19 @@ fn pick_type_backend() -> Result<InputBackendKind> {
     }
 }
 
+async fn guard_frontmost(session: Option<&AtspiSession>, tool: &str) -> Result<()> {
+    audit::require_writable()?;
+    let session = session.ok_or_else(|| policy::unclassified(tool))?;
+    let window = frontmost(session)
+        .await
+        .map_err(|_| policy::unclassified(tool))?;
+    let cfg = SensitiveConfig::load();
+    policy::enforce_window(&window, tool, &cfg)
+}
+
 /// Move pointer to absolute screen coordinates.
-pub async fn mouse_move(x: i32, y: i32) -> Result<String> {
+pub async fn mouse_move(session: Option<&AtspiSession>, x: i32, y: i32) -> Result<String> {
+    guard_frontmost(session, "mouse_move").await?;
     let backend = pick_mouse_backend()?;
     let detail = match backend {
         InputBackendKind::Ydotool => {
@@ -108,19 +121,34 @@ pub async fn mouse_move(x: i32, y: i32) -> Result<String> {
             )));
         }
     };
-    audit::record(
+    Ok(audit::record_after(
         "mouse_move",
         MutationClass::Mutating,
         Some(json!({"x": x, "y": y, "backend": format!("{backend:?}")})),
         true,
         &detail,
-    );
-    Ok(detail)
+    ))
 }
 
 /// Click at absolute coordinates (moves first).
-pub async fn mouse_click(x: i32, y: i32, button: u8) -> Result<String> {
+pub async fn mouse_click(
+    session: Option<&AtspiSession>,
+    x: i32,
+    y: i32,
+    button: u8,
+) -> Result<String> {
+    guard_frontmost(session, "mouse_click").await?;
     let backend = pick_mouse_backend()?;
+    let btn = match button {
+        1 => 1u8,
+        2 => 2,
+        3 => 3,
+        other => {
+            return Err(HarnessError::Other(format!(
+                "unsupported mouse button {other} (use 1=left 2=middle 3=right)"
+            )));
+        }
+    };
     let detail = match backend {
         InputBackendKind::Ydotool => {
             run_cmd(
@@ -128,14 +156,13 @@ pub async fn mouse_click(x: i32, y: i32, button: u8) -> Result<String> {
                 &["mousemove", "--absolute", &x.to_string(), &y.to_string()],
             )
             .await?;
-            // ydotool click: 0xC0 = left down+up typically; use `click` subcommand
-            let btn = match button {
+            let mask = match btn {
                 1 => "0xC0",
                 2 => "0xC1",
                 3 => "0xC2",
-                _ => "0xC0",
+                _ => unreachable!(),
             };
-            run_cmd("ydotool", &["click", btn]).await?
+            run_cmd("ydotool", &["click", mask]).await?
         }
         InputBackendKind::Xdotool => {
             run_cmd(
@@ -146,7 +173,7 @@ pub async fn mouse_click(x: i32, y: i32, button: u8) -> Result<String> {
                     &x.to_string(),
                     &y.to_string(),
                     "click",
-                    &button.to_string(),
+                    &btn.to_string(),
                 ],
             )
             .await?
@@ -155,28 +182,31 @@ pub async fn mouse_click(x: i32, y: i32, button: u8) -> Result<String> {
             return Err(HarnessError::Unavailable(format!("{other:?} cannot click")));
         }
     };
-    audit::record(
+    Ok(audit::record_after(
         "mouse_click",
         MutationClass::Mutating,
-        Some(json!({"x": x, "y": y, "button": button, "backend": format!("{backend:?}")})),
+        Some(json!({"x": x, "y": y, "button": btn, "backend": format!("{backend:?}")})),
         true,
         &detail,
-    );
-    Ok(detail)
+    ))
 }
 
 /// Type text via real key events (fallback when EditableText is missing).
-pub async fn type_text(text: &str) -> Result<String> {
+///
+/// Audit/result detail is a character count only — never the typed string.
+pub async fn type_text(session: Option<&AtspiSession>, text: &str) -> Result<String> {
+    guard_frontmost(session, "type_text").await?;
     let backend = pick_type_backend()?;
-    let detail = match backend {
-        InputBackendKind::Ydotool => run_cmd("ydotool", &["type", "--", text]).await?,
-        InputBackendKind::Wtype => run_cmd("wtype", &["--", text]).await?,
+    match backend {
+        InputBackendKind::Ydotool => run_cmd_quiet("ydotool", &["type", "--", text]).await?,
+        InputBackendKind::Wtype => run_cmd_quiet("wtype", &["--", text]).await?,
         InputBackendKind::Xdotool => {
-            run_cmd("xdotool", &["type", "--clearmodifiers", "--", text]).await?
+            run_cmd_quiet("xdotool", &["type", "--clearmodifiers", "--", text]).await?
         }
         InputBackendKind::None => unreachable!(),
     };
-    audit::record(
+    let detail = audit::typed_chars_detail(&format!("{backend:?}"), text.chars().count());
+    Ok(audit::record_after(
         "type_text",
         MutationClass::Mutating,
         Some(json!({
@@ -185,12 +215,12 @@ pub async fn type_text(text: &str) -> Result<String> {
         })),
         true,
         &detail,
-    );
-    Ok(detail)
+    ))
 }
 
 /// Send a key combo like `ctrl+c` or `Return` (backend-specific syntax).
-pub async fn key(keyspec: &str) -> Result<String> {
+pub async fn key(session: Option<&AtspiSession>, keyspec: &str) -> Result<String> {
+    guard_frontmost(session, "key").await?;
     let backend = pick_mouse_backend().or_else(|_| {
         if which("wtype") {
             Ok(InputBackendKind::Wtype)
@@ -201,29 +231,28 @@ pub async fn key(keyspec: &str) -> Result<String> {
         }
     })?;
     let detail = match backend {
-        InputBackendKind::Ydotool => {
-            // ydotool key uses keycodes; for S2 pass through as type of key name via `key`
-            run_cmd("ydotool", &["key", keyspec]).await?
-        }
+        InputBackendKind::Ydotool => run_cmd("ydotool", &["key", keyspec]).await?,
         InputBackendKind::Xdotool => run_cmd("xdotool", &["key", keyspec]).await?,
-        InputBackendKind::Wtype => {
-            // wtype -k for keys
-            run_cmd("wtype", &["-k", keyspec]).await?
-        }
+        InputBackendKind::Wtype => run_cmd("wtype", &["-k", keyspec]).await?,
         InputBackendKind::None => unreachable!(),
     };
-    audit::record(
+    Ok(audit::record_after(
         "key",
         MutationClass::Mutating,
         Some(json!({"key": keyspec, "backend": format!("{backend:?}")})),
         true,
         &detail,
-    );
-    Ok(detail)
+    ))
 }
 
 async fn run_cmd(bin: &str, args: &[&str]) -> Result<String> {
     debug!(bin, ?args, "input backend spawn");
+    run_cmd_quiet(bin, args).await?;
+    Ok(format!("{bin} ok"))
+}
+
+async fn run_cmd_quiet(bin: &str, args: &[&str]) -> Result<()> {
+    debug!(bin, argc = args.len(), "input backend spawn");
     let out = tokio::process::Command::new(bin)
         .args(args)
         .output()
@@ -231,11 +260,10 @@ async fn run_cmd(bin: &str, args: &[&str]) -> Result<String> {
         .map_err(|e| HarnessError::Unavailable(format!("spawn {bin}: {e}")))?;
     if !out.status.success() {
         return Err(HarnessError::Other(format!(
-            "{bin} {:?}: exit {:?} stderr={}",
-            args,
+            "{bin} exit {:?} stderr={}",
             out.status.code(),
             String::from_utf8_lossy(&out.stderr).trim()
         )));
     }
-    Ok(format!("{bin} {:?} ok", args))
+    Ok(())
 }

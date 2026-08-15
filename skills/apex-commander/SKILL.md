@@ -52,8 +52,15 @@ doctor
 ## Safety
 
 - Mutating tools are annotated (`readOnlyHint` / `destructiveHint`) for PolicyEngine.
-- Local **sensitive-app denylist** blocks password managers / keyrings by title/app name.
+  `type_into` / `type_text` / `key` / `launch` carry `destructiveHint` (secrets / submit / spawn).
+  `field_report` is **not** read-only (may GrabFocus + write a PNG).
+- Local **sensitive-app denylist** blocks password managers / keyrings by **window title +
+  app name** (not element ids). Targeted `snapshot` / `find` / `screenshot` of those
+  surfaces are blocked too. Coordinate input and full-display shots classify via frontmost.
+  Unclassifiable target → refuse (`Unavailable`), not a silent proceed.
+- `allow_override` in `sensitive.toml` is honoured **and audited**.
 - Every mutation appends to `~/.local/share/apex-commander/audit.jsonl` (or `$APEX_COMMANDER_STATE_DIR`).
+  Typed text is never stored — character count only. `Protected` a11y values are `[redacted]`.
 - Prefer `selftest` without `confirm_mutate` in automation; enable mutate only with human consent.
 
 ## Failure recovery

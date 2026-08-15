@@ -117,3 +117,12 @@ Standalone is first-class — ApexOS is a consumer, never the owner.
 - **2026-08-10** — charter adopted at Launchpad bootstrap (S0).
 - **2026-08-10** — product rename to Apex Commander / `ApexCommander-RS` / crates
   `apex-commander*` (D1 amended). Launch branding + public GitHub.
+- **2026-08-15** — D7 refined (S5 / `docs/audit-2026-08-15.md`): sensitive-app
+  policy matches **window title + app name** (bus-matched windows for element
+  ids), never the `{bus}|{path}` id string. Mutating tools and targeted
+  perception (`snapshot` / `find` / `screenshot`) **fail closed** when the
+  target cannot be classified. Full-display capture and coordinate input use
+  **frontmost**. `allow_override` is audited. Audit log must be writable
+  before a mutation; typed text never enters audit/result detail. `Protected`
+  a11y values are redacted. `field_report` is not read-only (may GrabFocus
+  and write a PNG). MCP holds one process-local AT-SPI session (not a daemon).

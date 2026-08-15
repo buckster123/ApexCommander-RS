@@ -69,7 +69,7 @@ capabilities; the public tool surface stays stable across compositors.
 | `snapshot` | Compact a11y tree (max_depth + max_nodes; bounds + actions) | read-only | **S1 live** |
 | `find_elements` | Semantic selectors (role + name/text/state) under a target | read-only | **S1 live** |
 | `focused_element` | Details of the currently focused a11y node under a target | read-only | **S1 live** |
-| `do_action` / `click_element` | AT-SPI action by name/index (default Click) | mutating | **S2 live** |
+| `do_action` / `click_element` | AT-SPI action by name/index (default Click; `click_element` falls back to Press/Activate) | mutating | **S2 live** (MCP `click_element` S5) |
 | `type_into` | EditableText set/append | mutating | **S2 live** |
 | `set_value` | Value interface (slider/spin) | mutating | **S2 live** |
 | `mouse_move` / `mouse_click` / `type_text` / `key` | Real input via ydotool/xdotool/wtype when installed | mutating | **S2 live** (probe) |
@@ -78,7 +78,7 @@ capabilities; the public tool surface stays stable across compositors.
 | `wait_for_element` | Poll find until match or timeout | read-only | **S3 live** |
 | `wait_for_stable` | Poll until tree fingerprint stable | read-only | **S3 live** |
 | `selftest` | Doctor + discovery + snapshot smoke; mutate only if confirmed | mixed | **S3 live** |
-| `field_report` | Compositor matrix for current session (identity + AT-SPI + capture) | read-only* | **S4 live** |
+| `field_report` | Compositor matrix for current session (identity + AT-SPI + capture + GrabFocus) | mutating (screenshot file + possible focus) | **S4 live** (annotation honest S5) |
 
 \*Screenshot is read-only w.r.t. the desktop but may write a file under the state dir.
 
@@ -207,9 +207,14 @@ never go in the repo; token files are `0600`.
 5. **Human physical input always wins.** Never grab exclusive input in a way that blocks the user.
 6. **No fake success.** Missing portal, bus, or permission → stated degrade with the real reason.
 7. **stdout sacred on MCP.** No `println!` for logs.
-8. **Audit every mutation.** No silent desktop side effects.
-9. **Sensitive-app denylist.** Password managers / keyrings / banking-looking surfaces block
-   open/focus/mutate unless explicitly overridden (override is itself audited).
+8. **Audit every mutation.** Require a writable audit log *before* the side effect. Never put
+   typed text in audit/result detail (character count only). Post-write failure is a stated
+   degrade on the result, not a silent drop.
+9. **Sensitive-app denylist.** Match **window title + app name** (and launch spec), never
+   AT-SPI element ids. Block open/focus/mutate **and** targeted perception (`snapshot` /
+   `find` / `screenshot`) of denylisted surfaces. Coordinate input and full-display capture
+   classify via **frontmost**. Fail closed when the target cannot be classified. Override
+   (`allow_override`) is itself audited. `Protected` a11y values emit `[redacted]`.
 10. **No network listeners by default.** Daemon is owner-only Unix socket only.
 11. **Pure-fn test surface.** Selectors, tree compactors, policy matchers, report builders are
     unit-tested; D-Bus / portal I/O is thin glue with optional field tests.
@@ -222,7 +227,8 @@ never go in the repo; token files are `0600`.
 | AT-SPI bus missing | Capability `atspi.available = false`; snapshot/find tools return `Unavailable` |
 | Input backend missing | Element AT-SPI actions may still work; coordinate tools return `Unavailable` |
 | Capture portal denied | `screenshot` returns `Unavailable` with portal/compositor detail |
-| Sensitive app frontmost | Mutating tools → `PolicyBlocked` |
+| Sensitive app targeted or frontmost | Mutating tools + targeted snapshot/find/screenshot → `PolicyBlocked` |
+| Target cannot be classified | Mutations / targeted perception / coordinate input → `Unavailable` (fail closed) |
 | Multiple element matches | `Ambiguous` with count + short names — agent re-snapshots |
 | Tool not yet implemented (slice gap) | MCP `isError` text naming the tool and pointing at `BACKLOG.md` |
 
