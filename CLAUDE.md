@@ -182,6 +182,7 @@ Project-specific (will grow in S1+):
 | `docs/field-matrix.md` | GNOME/Plasma/Hyprland field ledger |
 | `skills/apex-commander/SKILL.md` | Agent efficiency rules + tool cheatsheet |
 | `docs/gotchas.md` | **Any subsystem change — grep it first** |
+| `docs/audit-2026-08-15.md` | S5 findings (denylist / audit / honesty) — do not re-litigate; implement |
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
 
 ---

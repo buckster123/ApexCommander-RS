@@ -45,6 +45,25 @@
   return `Unavailable`. Prefer `do_action` / `type_into`. Don't hard-fail `doctor.ok` on missing
   input tools.
 
+- **Sensitive denylist matches title + app name, never element ids.** `{bus}|{path}` will
+  not contain `bitwarden`. Classify via bus-matched windows (or frontmost for coordinate /
+  full screenshot). Don't call `guard_name(element_id)` and think vaults are blocked.
+
+- **Fail closed when unclassified.** If AT-SPI cannot name the frontmost/target window,
+  refuse the mutation rather than injecting blindly. Don't "degrade open" on policy.
+
+- **`allow_override` is audited.** A `policy_override` JSONL line is written before the
+  tool proceeds. If the audit log is not writable, the override is refused.
+
+- **Typed text never goes in audit detail.** `type_text` / `type_into` record a character
+  count only. Don't format `run_cmd` argv (which includes the secret) into `detail`.
+
+- **`Protected` values are `[redacted]`.** Password-role text must not appear in snapshots.
+  Don't re-read `Text` after seeing that state.
+
+- **`field_report` is not read-only.** It may GrabFocus and write a PNG. Don't advertise
+  `readOnlyHint: true` for it.
+
 - **Sensitive denylist is substring + local only.** It does not replace ApexOS PolicyEngine
   approval. Patterns live in defaults + optional `~/.config/apex-commander/sensitive.toml`.
 

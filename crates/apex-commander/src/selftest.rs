@@ -176,9 +176,9 @@ pub async fn run_selftest(opts: SelftestOpts) -> Result<SelftestReport> {
         if input.available {
             // Small relative-safe absolute nudge: read nothing; move to a fixed on-screen point then back is hard
             // without get-position. Do a short diagonal hop that humans can see.
-            match mouse_move(200, 200).await {
+            match mouse_move(session.as_ref(), 200, 200).await {
                 Ok(d) => {
-                    let _ = mouse_move(220, 220).await;
+                    let _ = mouse_move(session.as_ref(), 220, 220).await;
                     steps.push(SelftestStep {
                         name: "mouse_wiggle".into(),
                         ok: true,

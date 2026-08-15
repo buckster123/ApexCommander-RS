@@ -1,14 +1,15 @@
 //! Mutation audit log — JSONL append-only trail.
 //!
 //! Path: `$APEX_COMMANDER_STATE_DIR/audit.jsonl` (default under XDG data).
+//! Mutations must call [`ensure_writable`] *before* the desktop side effect.
 
 use std::fs::OpenOptions;
 use std::io::Write;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
+use crate::error::{HarnessError, Result};
 use crate::paths::{audit_log_path, ensure_state_dir};
 use crate::types::MutationClass;
 
@@ -28,31 +29,43 @@ pub struct AuditEvent {
     pub detail: Option<String>,
 }
 
-/// Append a mutation event. Failures are logged and returned — callers may
-/// surface them but must not invent a silent success for the mutation itself.
-pub fn append(event: &AuditEvent) -> std::io::Result<()> {
+/// Create the log file (mode `0600`) so a later append is likely to succeed.
+pub fn ensure_writable() -> std::io::Result<()> {
     ensure_state_dir()?;
     let path = audit_log_path();
-    let mut f = OpenOptions::new().create(true).append(true).open(&path)?;
+    let _f = OpenOptions::new().create(true).append(true).open(&path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
+    Ok(())
+}
+
+/// Map I/O failure into a harness error (pre-mutation fail-closed).
+pub fn require_writable() -> Result<()> {
+    ensure_writable().map_err(|e| HarnessError::Other(format!("audit log not writable: {e}")))
+}
+
+/// Append a mutation event.
+pub fn append(event: &AuditEvent) -> std::io::Result<()> {
+    ensure_writable()?;
+    let path = audit_log_path();
+    let mut f = OpenOptions::new().create(true).append(true).open(&path)?;
     serde_json::to_writer(&mut f, event).map_err(std::io::Error::other)?;
     f.write_all(b"\n")?;
     f.flush()?;
     Ok(())
 }
 
-/// Build + append a standard event. Logs a warning if the write fails.
-pub fn record(
+/// Build + append. Returns the I/O error — callers must not swallow it silently.
+pub fn try_record(
     tool: &str,
     mutation: MutationClass,
     target: Option<serde_json::Value>,
     ok: bool,
     detail: impl Into<String>,
-) {
+) -> std::io::Result<()> {
     let event = AuditEvent {
         ts: Utc::now().to_rfc3339(),
         tool: tool.into(),
@@ -68,13 +81,30 @@ pub fn record(
             }
         },
     };
-    if let Err(e) = append(&event) {
-        warn!(error = %e, tool, "failed to write audit log");
+    append(&event)
+}
+
+/// Record after a mutation. On write failure, append a stated degrade to `detail`.
+pub fn record_after(
+    tool: &str,
+    mutation: MutationClass,
+    target: Option<serde_json::Value>,
+    ok: bool,
+    detail: &str,
+) -> String {
+    match try_record(tool, mutation, target, ok, detail) {
+        Ok(()) => detail.to_string(),
+        Err(e) => format!("{detail}; WARNING audit log write failed: {e}"),
     }
 }
 
+/// Detail for typed input: character count only — never the text.
+pub fn typed_chars_detail(backend: &str, n: usize) -> String {
+    format!("{backend} typed {n} char(s)")
+}
+
 /// Pure helper for tests: serialize one line.
-pub fn event_to_line(event: &AuditEvent) -> Result<String, serde_json::Error> {
+pub fn event_to_line(event: &AuditEvent) -> std::result::Result<String, serde_json::Error> {
     serde_json::to_string(event)
 }
 
@@ -117,5 +147,12 @@ mod tests {
         let body = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
         assert_eq!(body.lines().count(), 2);
         std::env::remove_var("APEX_COMMANDER_STATE_DIR");
+    }
+
+    #[test]
+    fn typed_detail_has_no_secrets() {
+        let d = typed_chars_detail("Ydotool", 12);
+        assert_eq!(d, "Ydotool typed 12 char(s)");
+        assert!(!d.contains("secret"));
     }
 }

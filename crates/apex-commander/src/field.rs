@@ -15,6 +15,7 @@ use crate::capture::{probe_capture, screenshot};
 use crate::doctor::run_doctor;
 use crate::error::Result;
 use crate::input::probe_input;
+use crate::policy::{self, SensitiveConfig};
 use crate::types::{FindQuery, SnapshotOpts, TargetRef};
 
 /// One named check in the field report.
@@ -334,11 +335,13 @@ pub async fn run_field_report(confirm_mutate: bool) -> Result<FieldReport> {
 
 fn pick_target(windows: Option<&[crate::types::WindowInfo]>) -> Option<TargetRef> {
     let wins = windows?;
+    let cfg = SensitiveConfig::load();
     let is_shell = |w: &crate::types::WindowInfo| {
         matches!(w.app_name.as_deref(), Some("gnome-shell") | Some("gjs"))
             || w.title == "Main stage"
             || w.title.starts_with("Desktop Icons")
             || w.title.is_empty()
+            || policy::match_sensitive(w.app_name.as_deref(), &w.title, &cfg).is_some()
     };
     // Prefer rich a11y UIs over terminals for snapshot/find field checks.
     let prefer = |w: &crate::types::WindowInfo| -> i32 {

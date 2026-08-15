@@ -145,7 +145,7 @@ printf '%s\n' \
 
 Register with ApexOS-RS: see [`docs/apexos-integration.md`](docs/apexos-integration.md).
 
-**22 tools** including discover, snapshot, find, do_action, type_into, wait_*, launch, screenshot, selftest, field_report.
+**23 tools** including discover, snapshot, find, do_action, click_element, type_into, wait_*, launch, screenshot, selftest, field_report.
 
 ---
 
@@ -184,9 +184,10 @@ Details: [`docs/field-matrix.md`](docs/field-matrix.md)
 
 - **No network listeners** by default  
 - **Audit trail** of mutations under `~/.local/share/apex-commander/audit.jsonl`  
-- **Sensitive-app denylist** (password managers, keyrings, …)  
+- **Sensitive-app denylist** by window title + app name (not element ids); fail closed if unclassified  
 - **Human override always wins** — real mouse/keyboard is never blocked  
-- Tool annotations for host PolicyEngines (`readOnlyHint` / `destructiveHint`)
+- Tool annotations for host PolicyEngines (`readOnlyHint` / `destructiveHint`)  
+- Audit JSONL never stores typed text (character count only); `Protected` values are redacted
 
 ---
 

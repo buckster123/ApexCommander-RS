@@ -31,6 +31,12 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   GrabFocus NotSupported). Plasma + Hyprland **PENDING** (sessions not installed on host —
   re-run script after login). Compositor gotchas in `docs/gotchas.md`. Evidence under
   `docs/field-evidence/`.
+- [ ] **S5 — policy honesty** (2026-08-15): denylist on window title/app (not element ids);
+  fail-closed unclassified; audited `allow_override`; no secrets in audit detail;
+  `Protected` redaction; MCP process-local AT-SPI session; honest `field_report` /
+  GrabFocus `NotSupported`; `click_element` on MCP. Findings: `docs/audit-2026-08-15.md`.
+  ✅ when merged + live: `do_action` on a vault window → `PolicyBlocked`; `type_text`
+  audit line has no payload text; `doctor` shows `policy` + `audit` caps.
 
 ## Post-v1 parking
 

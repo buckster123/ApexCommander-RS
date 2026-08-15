@@ -6,8 +6,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::a11y::probe_atspi;
+use crate::audit;
 use crate::capture::probe_capture;
 use crate::input::probe_input;
+use crate::paths::audit_log_path;
+use crate::policy::{self, SensitiveConfig};
 use crate::types::{Capability, SessionKind};
 
 /// Full readiness report produced by [`run_doctor`].
@@ -45,11 +48,39 @@ pub async fn run_doctor() -> DoctorReport {
     let input_cap = probe_input();
     let capture_cap = probe_capture().await;
 
+    let cfg = SensitiveConfig::load();
+    let audit_ok = audit::ensure_writable().is_ok();
+    let policy_cap = Capability {
+        name: "policy".into(),
+        available: true,
+        detail: Some(format!(
+            "denylist {} pattern(s); allow_override={}; config={}",
+            cfg.patterns().len(),
+            cfg.allow_override,
+            policy::sensitive_config_path().display()
+        )),
+    };
+    let audit_cap = Capability {
+        name: "audit".into(),
+        available: audit_ok,
+        detail: Some(format!(
+            "{}{}",
+            audit_log_path().display(),
+            if audit_ok {
+                " (writable)"
+            } else {
+                " (not writable — mutations will refuse)"
+            }
+        )),
+    };
+
     let capabilities = vec![
         session_cap,
         atspi_cap,
         input_cap.clone(),
         capture_cap.clone(),
+        policy_cap,
+        audit_cap,
         Capability {
             name: "window_backend".into(),
             available: atspi_ok,

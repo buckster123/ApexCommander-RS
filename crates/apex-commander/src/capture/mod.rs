@@ -14,10 +14,11 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 use tracing::{debug, info, warn};
 
-use crate::a11y::{bounds_of, list_windows, AtspiSession};
+use crate::a11y::{bounds_of, frontmost, resolve_window, AtspiSession};
 use crate::audit;
 use crate::error::{HarnessError, Result};
 use crate::paths::screenshots_dir;
+use crate::policy::{self, SensitiveConfig};
 use crate::types::{Bounds, Capability, MutationClass, ScreenshotResult, TargetRef};
 
 /// Probe capture availability for `doctor` (does not write a file).
@@ -103,6 +104,19 @@ pub async fn screenshot(
     session: Option<&AtspiSession>,
     target: Option<&TargetRef>,
 ) -> Result<ScreenshotResult> {
+    let cfg = SensitiveConfig::load();
+    if let (Some(session), Some(target)) = (session, target) {
+        let window = resolve_window(session, target).await?;
+        policy::enforce_window(&window, "screenshot", &cfg)?;
+    } else if let Some(session) = session {
+        match frontmost(session).await {
+            Ok(w) => policy::enforce_window(&w, "screenshot", &cfg)?,
+            Err(_) => return Err(policy::unclassified("screenshot")),
+        }
+    } else {
+        return Err(policy::unclassified("screenshot"));
+    }
+
     let out_dir = screenshots_dir().map_err(HarnessError::Io)?;
     let filename = format!(
         "shot-{}.png",
@@ -114,11 +128,12 @@ pub async fn screenshot(
     let mut scope = "display".to_string();
 
     if let (Some(session), Some(target)) = (session, target) {
-        if let Ok(b) = resolve_capture_bounds(session, target).await {
-            crop = Some(b);
-            scope = "window".into();
-        } else {
-            debug!("no bounds for target — full display screenshot");
+        match resolve_capture_bounds(session, target).await {
+            Ok(b) => {
+                crop = Some(b);
+                scope = "window".into();
+            }
+            Err(e) => debug!(error = %e, "no bounds for target — full display screenshot"),
         }
     }
 
@@ -153,7 +168,7 @@ pub async fn screenshot(
         bounds: crop,
     };
 
-    audit::record(
+    let _ = audit::record_after(
         "screenshot",
         MutationClass::ReadOnly, // desktop-readonly; still logged for agent trails
         Some(json!({
@@ -162,7 +177,7 @@ pub async fn screenshot(
             "path": result.path,
         })),
         true,
-        format!("{bytes} bytes"),
+        &format!("{bytes} bytes"),
     );
 
     info!(path = %result.path, %backend, bytes, "screenshot saved");
@@ -178,30 +193,7 @@ async fn resolve_capture_bounds(session: &AtspiSession, target: &TargetRef) -> R
                 .ok_or_else(|| HarnessError::Unavailable(format!("no bounds for {id}")))
         }
         other => {
-            let windows = list_windows(session).await?;
-            let w = match other {
-                TargetRef::Frontmost => crate::a11y::frontmost(session).await?,
-                TargetRef::Name(name) => {
-                    let needle = name.to_lowercase();
-                    windows
-                        .into_iter()
-                        .find(|w| {
-                            w.title.to_lowercase().contains(&needle)
-                                || w.app_name
-                                    .as_deref()
-                                    .map(|a| a.to_lowercase().contains(&needle))
-                                    .unwrap_or(false)
-                        })
-                        .ok_or_else(|| {
-                            HarnessError::NotFound(format!("no window matching {name:?}"))
-                        })?
-                }
-                TargetRef::Pid(pid) => windows
-                    .into_iter()
-                    .find(|w| w.pid == Some(*pid))
-                    .ok_or_else(|| HarnessError::NotFound(format!("no window for pid {pid}")))?,
-                TargetRef::Id(_) => unreachable!(),
-            };
+            let w = resolve_window(session, other).await?;
             w.bounds
                 .ok_or_else(|| HarnessError::Unavailable(format!("window {} has no bounds", w.id)))
         }

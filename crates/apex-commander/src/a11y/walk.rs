@@ -71,7 +71,11 @@ pub async fn walk_compact(
         let name = nonempty(proxy.name().await.ok());
         let description = nonempty(proxy.description().await.ok());
         let states = states_of(&proxy).await;
-        let value = value_of(&proxy).await;
+        let value = if states.iter().any(|s| s.eq_ignore_ascii_case("protected")) {
+            Some("[redacted]".into())
+        } else {
+            value_of(&proxy).await
+        };
         let actions = if opts.include_actions {
             actions_of(&proxy).await
         } else {
