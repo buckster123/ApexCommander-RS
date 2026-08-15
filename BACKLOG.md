@@ -31,12 +31,17 @@ pass (house doctrine #5). Notes carry the date and the evidence.
   GrabFocus NotSupported). Plasma + Hyprland **PENDING** (sessions not installed on host —
   re-run script after login). Compositor gotchas in `docs/gotchas.md`. Evidence under
   `docs/field-evidence/`.
-- [ ] **S5 — policy honesty** (2026-08-15): denylist on window title/app (not element ids);
-  fail-closed unclassified; audited `allow_override`; no secrets in audit detail;
-  `Protected` redaction; MCP process-local AT-SPI session; honest `field_report` /
-  GrabFocus `NotSupported`; `click_element` on MCP. Findings: `docs/audit-2026-08-15.md`.
-  ✅ when merged + live: `do_action` on a vault window → `PolicyBlocked`; `type_text`
-  audit line has no payload text; `doctor` shows `policy` + `audit` caps.
+- [x] **S5 — policy honesty** (2026-08-15 merge / 2026-08-16 live): denylist on window
+  title/app (not element ids); fail-closed unclassified; audited `allow_override`;
+  no secrets in audit detail; `Protected` redaction; MCP process-local AT-SPI session;
+  honest `field_report` / GrabFocus `NotSupported`; `click_element` on MCP.
+  Findings: `docs/audit-2026-08-15.md`.
+  Live (ubuntu:GNOME Wayland): `doctor` policy=13 patterns + audit writable;
+  `launch bitwarden` / `1password` → exit 5 `PolicyBlocked`; throwaway `deny=geany`
+  blocked live `snapshot` + `do-action` on Geany Minimize (haystack title+app, not
+  the element id); `allow_override` wrote `policy_override` then allowed snapshot;
+  `type_text` canary absent from audit (no input backend — exit 2). Evidence:
+  [`docs/field-evidence/s5-policy-honesty.md`](docs/field-evidence/s5-policy-honesty.md).
 
 ## Post-v1 parking
 
